@@ -1,0 +1,24 @@
+{
+  "name": "@tahawash/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared TypeScript types for the Tahawash platform (domain entities, API contracts).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

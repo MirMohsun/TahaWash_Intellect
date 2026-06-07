@@ -1,0 +1,27 @@
+{
+  "name": "@tahawash/i18n-locales",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tahawash translation files — AZ / RU / EN. Single source of truth used by mobile + admin.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./az": "./src/az.json",
+    "./ru": "./src/ru.json",
+    "./en": "./src/en.json"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

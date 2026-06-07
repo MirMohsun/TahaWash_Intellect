@@ -1,0 +1,13 @@
+# Tahawash backend — files Docker should NOT bake into the build context.
+# Note: Docker reads this when build context = apps/backend. Our Railway
+# build context is the monorepo root, so the root .dockerignore is the
+# authoritative one. This file is here for direct `docker build` usage.
+
+node_modules
+dist
+.env
+.env.local
+*.log
+.DS_Store
+coverage
+.turbo

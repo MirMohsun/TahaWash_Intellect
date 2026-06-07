@@ -1,0 +1,13 @@
+diff --git a/babel.js b/babel.js
+index 0000000..1111111 100644
+--- a/babel.js
++++ b/babel.js
+@@ -9,8 +9,6 @@ module.exports = function () {
+           importSource: "react-native-css-interop",
+         },
+       ],
+-      // Use this plugin in reanimated 4 and later
+-      "react-native-worklets/plugin",
+     ],
+   };
+ };

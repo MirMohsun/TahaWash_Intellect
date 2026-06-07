@@ -1,0 +1,57 @@
+# Tahawash — local development infrastructure
+#
+# Provides PostgreSQL (with PostGIS) and Redis for local dev.
+# Production uses Railway managed services.
+#
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# Wipe:   docker compose down -v        (drops all data)
+# Logs:   docker compose logs -f
+# Status: docker compose ps
+
+services:
+  postgres:
+    # PostgreSQL 16 with PostGIS bundled. The postgis/postgis image
+    # pre-installs postgis + a few support extensions in the public schema
+    # on first boot; Prisma tracks all of them via `extensions = [...]`
+    # in schema.prisma so there's no drift.
+    image: postgis/postgis:16-3.4-alpine
+    container_name: tahawash-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tahawash
+    ports:
+      # Host port 5434 → container port 5432.
+      # User already runs a PostgreSQL cluster on the standard ports (5432/5433/5435/5436);
+      # we use 5434 to stay isolated.
+      - '5434:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d tahawash']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: tahawash-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+    name: tahawash-postgres-data
+  redis-data:
+    name: tahawash-redis-data

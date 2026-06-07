@@ -1,0 +1,58 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": { "simulator": true },
+      "channel": "development",
+      "node": "22.13.0",
+      "pnpm": "10.31.0",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:3000"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "node": "22.13.0",
+      "pnpm": "10.31.0",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://tahawash-production.up.railway.app",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYm9iYnljaGF2ZXMiLCJhIjoiY21wcHNrZnF2MDN4MjJzc2VnM2trbWlxayJ9.mPwFjGL1wU9-GBP_i9IuwA"
+      }
+    },
+    "staging": {
+      "distribution": "internal",
+      "channel": "staging",
+      "node": "22.13.0",
+      "pnpm": "10.31.0",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://staging-api.tahawash.az"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "node": "22.13.0",
+      "pnpm": "10.31.0",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.tahawash.az"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "production"
+      },
+      "ios": {}
+    }
+  }
+}

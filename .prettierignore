@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.next/
+.expo/
+.turbo/
+.cache/
+out/
+coverage/
+pnpm-lock.yaml
+*.md
+*.tsbuildinfo
+Design_Mobile_App/
+Design_Admin_Panels/

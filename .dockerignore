@@ -1,0 +1,42 @@
+# Tahawash monorepo — files excluded from Docker build context.
+# Railway invokes `docker build` from the repo root with the per-app
+# Dockerfile selected via railway.json `dockerfilePath`.
+
+# Heavy / always-fresh
+**/node_modules
+**/.turbo
+**/dist
+**/build
+**/.next
+
+# Local secrets
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Logs + caches
+**/*.log
+**/.DS_Store
+**/coverage
+
+# Editor + IDE
+.vscode
+.idea
+
+# Git / GH
+.git
+.github
+.gitignore
+
+# Docs that don't belong in the runtime image
+README.md
+DEPLOYMENT.md
+
+# Mobile source is only built via EAS — exclude from backend/admin images.
+# BUT we need apps/mobile/package.json so pnpm can resolve the workspace
+# graph (otherwise pnpm install fails: "missing workspace project").
+apps/mobile
+!apps/mobile/package.json
+
+# Memory / planning files (these live outside the repo anyway, but be safe)
+memory

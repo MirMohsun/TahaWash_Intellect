@@ -1,0 +1,17 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "Prisma.prisma",
+    "eamodio.gitlens",
+    "usernamehw.errorlens",
+    "vivaxy.vscode-conventional-commits",
+    "expo.vscode-expo-tools",
+    "mikestead.dotenv",
+    "yoavbls.pretty-ts-errors",
+    "ms-azuretools.vscode-docker",
+    "EditorConfig.EditorConfig"
+  ],
+  "unwantedRecommendations": []
+}

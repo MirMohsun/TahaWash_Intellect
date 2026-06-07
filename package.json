@@ -1,0 +1,57 @@
+{
+  "name": "tahawash",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tahawash — self-service carwash payment platform for Azerbaijan. Monorepo.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rustamakbarli27/tahawash.git"
+  },
+  "packageManager": "pnpm@10.31.0",
+  "engines": {
+    "node": ">=22.0.0 <25.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.3.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "bcrypt",
+      "esbuild",
+      "prisma",
+      "unrs-resolver"
+    ],
+    "patchedDependencies": {
+      "expo-modules-core@2.2.3": "patches/expo-modules-core@2.2.3.patch",
+      "react-native-css-interop@0.2.4": "patches/react-native-css-interop@0.2.4.patch"
+    }
+  }
+}

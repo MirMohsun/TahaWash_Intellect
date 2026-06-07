@@ -1,0 +1,43 @@
+# Tahawash admin — Caddy config for serving the Vite SPA on Railway.
+#
+# Railway injects $PORT at runtime. Caddy binds to it and serves /srv.
+# - try_files with index.html fallback so TanStack Router client-side
+#   routes (e.g. /super-admin/dashboard) work on hard refresh.
+# - long-cache hashed assets, no-cache for index.html.
+# - gzip + zstd compression.
+# - basic security headers.
+
+{
+	# Disable the admin API on the runtime container.
+	admin off
+	# Auto-https off — Railway terminates TLS at the edge proxy.
+	auto_https off
+	persist_config off
+}
+
+:{$PORT:8080} {
+	root * /srv
+	encode zstd gzip
+
+	# Long-cache for fingerprinted assets (Vite emits *.[hash].js / .css).
+	@hashedAssets path_regexp \.(js|css|woff2?|ttf|svg|png|jpg|jpeg|webp|avif|ico)$
+	header @hashedAssets Cache-Control "public, max-age=31536000, immutable"
+
+	# index.html must never be cached so new deploys are picked up immediately.
+	@indexHtml path /index.html /
+	header @indexHtml Cache-Control "no-cache, no-store, must-revalidate"
+
+	# Security headers (the strict ones; CSP is intentionally lax for MVP —
+	# tighten before public launch).
+	header X-Content-Type-Options nosniff
+	header Referrer-Policy strict-origin-when-cross-origin
+	header X-Frame-Options DENY
+	header Permissions-Policy "interest-cohort=()"
+	# CORP — needed if assets are ever cross-origin loaded.
+	header Cross-Origin-Resource-Policy "same-origin"
+
+	# SPA fallback — every unmatched route returns index.html so the
+	# client-side router takes over.
+	try_files {path} /index.html
+	file_server
+}

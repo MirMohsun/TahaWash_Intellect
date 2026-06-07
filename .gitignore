@@ -1,0 +1,122 @@
+# ─────────────────────────────────────────────────────────
+# Tahawash — monorepo .gitignore
+# ─────────────────────────────────────────────────────────
+
+# Dependencies
+node_modules/
+.pnpm-store/
+.pnp.*
+
+# Build outputs
+dist/
+build/
+.next/
+.expo/
+.expo-shared/
+.turbo/
+.cache/
+out/
+*.tsbuildinfo
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs/
+
+# Editor / IDE
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code (commit only recommended workspace config)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Testing / coverage
+coverage/
+*.lcov
+.nyc_output/
+junit.xml
+
+# Lock files — commit pnpm-lock only
+package-lock.json
+yarn.lock
+
+# React Native / Expo native artifacts
+ios/Pods/
+ios/build/
+ios/.xcode.env.local
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/local.properties
+android/keystores/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Database (local SQLite snapshots)
+*.sqlite
+*.sqlite3
+*.db
+
+# Secrets / certificates (never commit)
+secrets/
+*.pem
+*.cert
+*.crt
+*.csr
+
+# Sentry
+.sentryclirc
+
+# Sentry source maps uploads
+.sentry/
+
+# Prisma
+prisma/migrations/dev.db
+prisma/migrations/dev.db-journal
+
+# Generated artifacts
+generated/
+__generated__/
+
+# Storybook
+storybook-static/
+
+# Misc
+*.tmp
+*.temp
+.history/
+preview.apk
+preview.bundle.js
+eas-log.txt
+manifest.bin
+.patch-tmp/
+preview-assets/
