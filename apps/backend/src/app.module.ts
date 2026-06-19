@@ -5,14 +5,15 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { RequestContextInterceptor } from './common/request-context.interceptor';
 import { validateEnv } from './config/env.schema';
 import { AuthModule } from './modules/auth/auth.module';
+import { BaysModule } from './modules/bays/bays.module';
 import { HardwareModule } from './modules/hardware/hardware.module';
 import { HardwareAdminModule } from './modules/hardware-admin/hardware-admin.module';
-import { BaysModule } from './modules/bays/bays.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { EmailModule } from './modules/email/email.module';
 import { HealthModule } from './modules/health/health.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { LocationsModule } from './modules/locations/locations.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { PublicModule } from './modules/public/public.module';
 import { PushModule } from './modules/push/push.module';
@@ -59,6 +60,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     SuperAdminModule,
     PublicModule,
     CustomersModule,
+    PaymentsModule,
     JobsModule,
     HealthModule,
     UploadsModule,

@@ -388,17 +388,14 @@ function InlineEdit({
   );
 }
 
-// ─── Hardware online badge ──────────────────────────────────────────
+// ─── Hardware online badge ───────────────────────────────────────────
 
 function HardwareOnlineBadge({ online }: { online: boolean | null }) {
   const { t } = useTranslation();
   if (online === null) return null;
   return (
     <span
-      className={`inline-flex items-center gap-1 text-xs font-medium ${
-        online ? 'text-success' : 'text-ink-400'
-      }`}
-      title={online ? t('tenantAdmin.bays.hardwareOnline') : t('tenantAdmin.bays.hardwareOffline')}
+      className={`inline-flex items-center gap-1 text-xs font-medium ${online ? 'text-success' : 'text-ink-400'}`}
     >
       {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
       {online ? t('tenantAdmin.bays.hardwareOnline') : t('tenantAdmin.bays.hardwareOffline')}
