@@ -69,6 +69,14 @@ export const envSchema = z.object({
         .filter((o) => o.length > 0),
     ),
 
+  // MQTT broker (hardware bridge — Raspberry Pi Pico)
+  MQTT_URL: z.string().default('mqtt://localhost:1883'),
+  MQTT_USERNAME: z.string().default('tahawash-backend'),
+  MQTT_PASSWORD: z.string().min(1).default('changeme'),
+  // Секунды ожидания ACK от железа после bank approval. По истечении —
+  // транзакция переходит в paid_hardware_error.
+  HARDWARE_ACK_TIMEOUT_S: z.coerce.number().int().positive().default(30),
+
   // Cloudflare R2 (S3-compatible object storage) for tenant logos + photos.
   //   - All five vars are OPTIONAL at the schema level so dev/test envs
   //     without R2 still boot. The uploads endpoint returns 503 with a

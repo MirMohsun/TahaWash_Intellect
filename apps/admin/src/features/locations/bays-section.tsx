@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios';
-import { Download, FileDown, Pencil, Plus, RefreshCw, Wrench, X } from 'lucide-react';
+import { Download, FileDown, Pencil, Plus, RefreshCw, Wifi, WifiOff, Wrench, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import {
   useToggleBayStatus,
   useUpdateBay,
 } from '@/hooks/use-bays';
+import { useHardwareStatus } from '@/hooks/use-hardware-status';
 import { downloadBayQrPdf, downloadLocationBulkQrPdf, type TenantBay } from '@/lib/bays-api';
 
 /**
@@ -118,6 +119,7 @@ export function BaysSection({
 
 function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
   const { t } = useTranslation();
+  const hardwareStatus = useHardwareStatus(bay.id);
   const updateMut = useUpdateBay(locationId);
   const toggleMut = useToggleBayStatus(locationId);
   const regenMut = useRegenerateBayQr(locationId);
@@ -231,7 +233,12 @@ function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
               <Pencil className="h-3.5 w-3.5 text-ink-300 group-hover:text-ink-500" />
             </button>
           )}
-          <p className="mt-1 text-xs text-ink-500 font-mono">QR · {bay.qrShortId}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-ink-500 font-mono">QR · {bay.qrShortId}</p>
+            {bay.hardwareIdentifier && (
+              <HardwareOnlineBadge online={hardwareStatus.data?.online ?? null} />
+            )}
+          </div>
         </div>
         <BayStatusBadge status={bay.status} />
       </div>
@@ -378,6 +385,24 @@ function InlineEdit({
         <X className="h-4 w-4" />
       </button>
     </div>
+  );
+}
+
+// ─── Hardware online badge ──────────────────────────────────────────
+
+function HardwareOnlineBadge({ online }: { online: boolean | null }) {
+  const { t } = useTranslation();
+  if (online === null) return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-xs font-medium ${
+        online ? 'text-success' : 'text-ink-400'
+      }`}
+      title={online ? t('tenantAdmin.bays.hardwareOnline') : t('tenantAdmin.bays.hardwareOffline')}
+    >
+      {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+      {online ? t('tenantAdmin.bays.hardwareOnline') : t('tenantAdmin.bays.hardwareOffline')}
+    </span>
   );
 }
 

@@ -1,0 +1,19 @@
+# Пример структуры файла паролей.
+# РЕАЛЬНЫЙ файл называется devices.txt и НЕ коммитится в git (см. .gitignore).
+#
+# Как создать:
+#   1. Войти в контейнер: docker compose exec mosquitto sh
+#   2. Создать файл: mosquitto_passwd -c /mosquitto/config/passwd/devices.txt tahawash-backend
+#      (введёт пароль интерактивно)
+#   3. Добавить устройство: mosquitto_passwd /mosquitto/config/passwd/devices.txt tahawash-device
+#   4. Добавить healthcheck: mosquitto_passwd /mosquitto/config/passwd/devices.txt healthcheck
+#   5. Перезапустить: docker compose restart mosquitto
+#
+# Или одной командой (автоматически, без интерактива):
+#   docker compose exec mosquitto mosquitto_passwd -b /mosquitto/config/passwd/devices.txt \
+#     tahawash-backend <BACKEND_MQTT_PASSWORD>
+#
+# Формат хэшированной строки (Mosquitto генерирует сам, не редактировать вручную):
+# tahawash-backend:$7$101$abc123...=
+# tahawash-device:$7$101$xyz456...=
+# healthcheck:$7$101$qwe789...=

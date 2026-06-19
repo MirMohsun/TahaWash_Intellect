@@ -5,6 +5,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { RequestContextInterceptor } from './common/request-context.interceptor';
 import { validateEnv } from './config/env.schema';
 import { AuthModule } from './modules/auth/auth.module';
+import { HardwareModule } from './modules/hardware/hardware.module';
+import { HardwareAdminModule } from './modules/hardware-admin/hardware-admin.module';
 import { BaysModule } from './modules/bays/bays.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { EmailModule } from './modules/email/email.module';
@@ -39,6 +41,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 60 }]),
 
     PrismaModule,
+    HardwareModule,
+    HardwareAdminModule,
     SmsModule,
     PushModule,
     EmailModule,

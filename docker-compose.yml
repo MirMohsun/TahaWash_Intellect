@@ -50,8 +50,40 @@ services:
       timeout: 5s
       retries: 10
 
+  mosquitto:
+    build:
+      context: ./apps/mqtt-broker
+      dockerfile: Dockerfile
+    container_name: tahawash-mqtt
+    restart: unless-stopped
+    ports:
+      - '1883:1883'
+      # - '8883:8883'   раскомментировать когда будут TLS-сертификаты
+    volumes:
+      # Конфиг и ACL — читаём из репо (read-only)
+      - ./apps/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./apps/mqtt-broker/acl/acl.conf:/mosquitto/config/acl/acl.conf:ro
+      # Пароли — монтируем отдельно (файл создаётся вручную, не в git)
+      - ./apps/mqtt-broker/passwd:/mosquitto/config/passwd:ro
+      # Данные (persistence) и логи — в именованных томах
+      - mqtt-data:/mosquitto/data
+      - mqtt-logs:/mosquitto/log
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mosquitto_pub -h localhost -p 1883 -u healthcheck -P healthcheck -t test -m ping || exit 1',
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres-data:
     name: tahawash-postgres-data
   redis-data:
     name: tahawash-redis-data
+  mqtt-data:
+    name: tahawash-mqtt-data
+  mqtt-logs:
+    name: tahawash-mqtt-logs

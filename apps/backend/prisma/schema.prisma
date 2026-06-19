@@ -156,15 +156,16 @@ model Tenant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  user          TenantUser?
-  locations     Location[]
-  photos        TenantPhoto[]
-  services      ServiceDisplay[]
-  subscriptions Subscription[]
-  transactions  Transaction[]
-  bays          Bay[]
-  favorites     Favorite[]
-  featured      FeaturedTenant?
+  user            TenantUser?
+  locations       Location[]
+  photos          TenantPhoto[]
+  services        ServiceDisplay[]
+  subscriptions   Subscription[]
+  transactions    Transaction[]
+  bays            Bay[]
+  favorites       Favorite[]
+  featured        FeaturedTenant?
+  hardwareEvents  HardwareEvent[]
 
   @@index([status])
   @@index([deletedAt])
@@ -284,10 +285,15 @@ model Bay {
   qrShortId          String    @unique
   status             BayStatus @default(active)
 
+  // Hardware bridge — обновляется при каждом heartbeat от Pico
+  lastSeenAt     DateTime? // когда Pico последний раз вышел на связь
+  lastRelayState Json?     // snapshot реле { fn2: 0, fn3: 1, ... }
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  transactions Transaction[]
+  transactions    Transaction[]
+  hardwareEvents  HardwareEvent[]
 
   @@index([locationId])
   @@index([tenantId])
@@ -404,6 +410,7 @@ enum PaymentMethod {
   card
   apple_pay
   google_pay
+  cash // купюроприёмник (offline payment через Pico)
 }
 
 model Transaction {
@@ -434,6 +441,38 @@ model Transaction {
   @@index([bayId, createdAt(sort: Desc)])
   @@index([status])
   @@map("transactions")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// HARDWARE EVENTS (ежедневный отчёт от Pico)
+// ════════════════════════════════════════════════════════════════════════════
+
+model HardwareEvent {
+  // Одна строка = одно событие из daily_report Pico.
+  // eventType:
+  //   "cash"    — принята купюра (купюроприёмник, наличные)
+  //   "online"  — онлайн-оплата через эмуляцию импульсов
+  //   "usage"   — мониторинг: какая программа запустилась и сколько длилась
+  //   "anomaly" — слишком много импульсов подряд (помеха/сбой)
+  id              String   @id @default(cuid())
+  bayId           String
+  bay             Bay      @relation(fields: [bayId], references: [id], onDelete: Restrict)
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  eventType       String   // "cash" | "online" | "usage" | "anomaly"
+  amountAzn       Decimal? @db.Decimal(10, 2)
+  pulses          Int?
+  txId            String?  // Transaction.id для online-событий
+  programName     String?
+  durationSeconds Int?     // для usage-событий
+  relayCombo      String[] // комбинация активных реле для usage
+  reportDate      String   // "YYYY-MM-DD" — день отчёта (по времени Баку)
+  rawTs           String   // ISO-таймстамп от Pico (Asia/Baku)
+  createdAt       DateTime @default(now())
+
+  @@index([bayId, reportDate])
+  @@index([tenantId, reportDate])
+  @@map("hardware_events")
 }
 
 // ════════════════════════════════════════════════════════════════════════════
