@@ -1,0 +1,3 @@
+# Файл паролей содержит хэши — не коммитим в git.
+# Создаётся командой из README.md: make mqtt-passwd
+devices.txt

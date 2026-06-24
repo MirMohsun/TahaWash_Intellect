@@ -24,7 +24,7 @@
       "node": "22.13.0",
       "pnpm": "10.31.0",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://tahawash-production.up.railway.app",
+        "EXPO_PUBLIC_API_URL": "https://api.okul.az",
         "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYm9iYnljaGF2ZXMiLCJhIjoiY21wcHNrZnF2MDN4MjJzc2VnM2trbWlxayJ9.mPwFjGL1wU9-GBP_i9IuwA"
       }
     },

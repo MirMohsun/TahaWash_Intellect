@@ -42,6 +42,22 @@ export const envSchema = z.object({
   // behalf. Recommended in production; not required for delivery to work.
   EXPO_ACCESS_TOKEN: z.string().optional(),
 
+  // Payments (ePoint.az).
+  //   - `mock` simulates the full payment lifecycle in-process (dev/testing,
+  //     no real money) so scan→pay→credit→success is demoable before creds.
+  //   - `epoint` calls the real ePoint API (https://epoint.az/api/1 by default;
+  //     override EPOINT_BASE_URL for sandbox).
+  // Each tenant has its OWN merchant credentials (public_key + private_key);
+  // the private_key is stored encrypted (see PAYMENT_ENCRYPTION_KEY).
+  PAYMENT_PROVIDER: z.enum(['mock', 'epoint']).default('mock'),
+  EPOINT_BASE_URL: z.string().url().default('https://epoint.az/api/1'),
+  // 32-byte key (base64 or hex) for AES-256-GCM encryption of each tenant's
+  // ePoint private_key at rest. Optional at the schema level so dev/test boot
+  // without it; REQUIRED when PAYMENT_PROVIDER=epoint (the module fails loudly
+  // otherwise). Generate:
+  //   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+  PAYMENT_ENCRYPTION_KEY: z.string().optional(),
+
   // Email. `mock` logs to console; `resend` posts to the Resend API
   // (wired when the account + domain DNS are provisioned).
   EMAIL_PROVIDER: z.enum(['mock', 'resend']).default('mock'),
@@ -68,6 +84,12 @@ export const envSchema = z.object({
         .map((o) => o.trim())
         .filter((o) => o.length > 0),
     ),
+
+  // MQTT broker (hardware bridge — Raspberry Pi Pico)
+  MQTT_URL: z.string().default('mqtt://localhost:1883'),
+  MQTT_USERNAME: z.string().default('tahawash-backend'),
+  MQTT_PASSWORD: z.string().min(1).default('changeme'),
+  HARDWARE_ACK_TIMEOUT_S: z.coerce.number().int().positive().default(30),
 
   // Cloudflare R2 (S3-compatible object storage) for tenant logos + photos.
   //   - All five vars are OPTIONAL at the schema level so dev/test envs

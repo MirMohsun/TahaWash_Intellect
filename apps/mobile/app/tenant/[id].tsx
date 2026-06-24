@@ -3,7 +3,9 @@ import * as Linking from 'expo-linking';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -125,15 +127,54 @@ export default function TenantBrandPage() {
     const lat = primary.latitude;
     const lng = primary.longitude;
     const label = encodeURIComponent(`${carwash.brandName} · ${primary.name}`);
-    // Apple Maps URL works on iOS; geo: on Android. expo-linking handles both.
-    const url =
-      // iOS: `maps://` deep-links into Apple Maps even without the app installed.
-      `https://maps.apple.com/?ll=${lat},${lng}&q=${label}`;
-    try {
-      await Linking.openURL(url);
-    } catch {
-      // No-op — user can copy the address from the card.
+
+    // Android: hand off to the OS. A `geo:` intent makes Android show its
+    // native "Open with" chooser listing every installed map app (Google
+    // Maps, Waze, …) — the platform-standard selector, no in-app picker.
+    if (Platform.OS === 'android') {
+      try {
+        await Linking.openURL(`geo:${lat},${lng}?q=${lat},${lng}(${label})`);
+      } catch {
+        await Linking.openURL(
+          `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+        ).catch(() => {});
+      }
+      return;
     }
+
+    // iOS has no system-wide map-app chooser, so use the NATIVE action sheet
+    // (the standard iOS pattern) listing only the map apps that are installed.
+    const apps: { label: string; url: string }[] = [
+      { label: 'Apple Maps', url: `maps://?daddr=${lat},${lng}&dirflg=d` },
+    ];
+    if (await Linking.canOpenURL('comgooglemaps://')) {
+      apps.push({
+        label: 'Google Maps',
+        url: `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`,
+      });
+    }
+    if (await Linking.canOpenURL('waze://')) {
+      apps.push({ label: 'Waze', url: `waze://?ll=${lat},${lng}&navigate=yes` });
+    }
+
+    // Only Apple Maps installed → just open it; a one-item sheet is pointless.
+    if (apps.length === 1) {
+      await Linking.openURL(apps[0]!.url).catch(() => {});
+      return;
+    }
+
+    const options = [...apps.map((a) => a.label), t('common.cancel', { defaultValue: 'Cancel' })];
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: t('tenant.directionsVia', { defaultValue: 'Get directions with' }),
+        options,
+        cancelButtonIndex: options.length - 1,
+      },
+      (index) => {
+        const app = apps[index];
+        if (app) void Linking.openURL(app.url).catch(() => {});
+      },
+    );
   };
 
   const handleFavoriteToggle = () => {

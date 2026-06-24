@@ -14,7 +14,7 @@ export type TransactionStatus =
 
 import type { CardBrand } from './customer';
 
-export type PaymentMethod = 'card' | 'apple_pay' | 'google_pay';
+export type PaymentMethod = 'card' | 'apple_pay' | 'google_pay' | 'cash';
 
 export interface Transaction {
   id: string;

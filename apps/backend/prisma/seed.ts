@@ -183,6 +183,7 @@ async function main(): Promise<void> {
     update: {},
     create: {
       customerId: elvin.id,
+      tenantId: yubox.id,
       ePointToken: 'epoint_token_dev_elvin_visa_4242',
       brand: 'visa',
       lastFour: '4242',

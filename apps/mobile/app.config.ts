@@ -48,6 +48,9 @@ const config: ExpoConfig = {
       NSCameraUsageDescription: 'Tahawash needs camera access to scan QR codes on wash bays.',
       NSLocationWhenInUseUsageDescription:
         'Tahawash uses your location to show nearby carwashes on the map.',
+      // Lets Linking.canOpenURL detect these map apps so the "Get directions"
+      // action sheet only lists the ones actually installed.
+      LSApplicationQueriesSchemes: ['comgooglemaps', 'waze'],
     },
   },
   android: {

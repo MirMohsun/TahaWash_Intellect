@@ -66,13 +66,15 @@ export default function MainTab() {
       ? {
           centerLat: userLoc.location.lat,
           centerLng: userLoc.location.lng,
-          radiusKm: 50,
+          radiusKm: 20,
         }
       : {},
   );
 
-  const nearestOpenCarwash = useMemo(() => {
-    return pickNearestOpen(carwashesQuery.data?.items ?? [], userLoc);
+  // Up to 3 nearest carwashes within the radius — shown as a small stack on
+  // the home feed; the full set lives on the Wash map.
+  const nearbyOpen = useMemo(() => {
+    return pickNearestOpen(carwashesQuery.data?.items ?? [], userLoc, 3);
   }, [carwashesQuery.data, userLoc]);
 
   const recentTenants = useMemo(() => {
@@ -217,8 +219,7 @@ export default function MainTab() {
         />
 
         <OpenNowSection
-          carwash={nearestOpenCarwash?.carwash}
-          distanceKm={nearestOpenCarwash?.distanceKm}
+          items={nearbyOpen}
           // Show the skeleton while EITHER the carwash list is fetching OR
           // the location is still resolving — so the section shows a
           // placeholder immediately instead of nothing, then fills in.
@@ -572,117 +573,124 @@ function FavoritesSection({ favorites, loading }: { favorites: FavoriteItem[]; l
   );
 }
 
-function OpenNowSection({
-  carwash,
-  distanceKm,
-  loading,
-}: {
-  carwash: PublicCarwash | undefined;
-  distanceKm: number | undefined;
-  loading: boolean;
-}) {
+interface NearbyCarwash {
+  carwash: PublicCarwash;
+  distanceKm: number;
+}
+
+function OpenNowSection({ items, loading }: { items: NearbyCarwash[]; loading: boolean }) {
   const { t } = useTranslation();
   if (loading) {
     return (
       <Section title={t('main.openNowTitle')}>
-        <View style={{ paddingHorizontal: 16 }}>
-          <Card padding={12}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Skeleton width={72} height={72} radius={12} />
-              <View style={{ flex: 1, gap: 6 }}>
-                <Skeleton width="40%" height={11} />
-                <Skeleton width="80%" height={16} />
-                <Skeleton width="60%" height={12} />
+        <View style={{ paddingHorizontal: 16, gap: 10 }}>
+          {[0, 1].map((i) => (
+            <Card key={i} padding={12}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Skeleton width={72} height={72} radius={12} />
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Skeleton width="40%" height={11} />
+                  <Skeleton width="80%" height={16} />
+                  <Skeleton width="60%" height={12} />
+                </View>
+                <Skeleton width={44} height={44} radius={22} />
               </View>
-              <Skeleton width={44} height={44} radius={22} />
-            </View>
-          </Card>
+            </Card>
+          ))}
         </View>
       </Section>
     );
   }
-  if (!carwash) return null;
-  const primary = carwash.locations[0];
-  const bayCount = primary?.bayCount ?? 0;
+  if (items.length === 0) return null;
 
   return (
     <Section title={t('main.openNowTitle')}>
-      <View style={{ paddingHorizontal: 16 }}>
-        <Card onPress={() => router.push(`/tenant/${carwash.id}`)} padding={12}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: 12,
-                backgroundColor: colors.lineSoft,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <RemoteImage
-                uri={carwash.logoUrl}
-                style={{ width: 48, height: 48, borderRadius: 48 * 0.28 }}
-                fallback={<TenantMark name={carwash.brandName} size={48} />}
-              />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text
-                style={{
-                  fontFamily: 'Inter_700Bold',
-                  fontSize: 11,
-                  letterSpacing: 0.4,
-                  textTransform: 'uppercase',
-                  color: colors.success,
-                }}
-              >
-                {distanceKm !== undefined
-                  ? `${t('wash.open')} · ${formatDistance(distanceKm)}`
-                  : t('wash.open')}
-              </Text>
-              <Text
-                style={{
-                  marginTop: 2,
-                  fontFamily: 'Inter_700Bold',
-                  fontSize: 16,
-                  letterSpacing: -0.3,
-                  color: colors.ink[900],
-                }}
-                numberOfLines={1}
-              >
-                {carwash.brandName}
-                {primary?.name ? ` · ${primary.name}` : ''}
-              </Text>
-              <Text
-                style={{
-                  marginTop: 2,
-                  fontFamily: 'Inter_400Regular',
-                  fontSize: 12,
-                  color: colors.ink[500],
-                }}
-              >
-                {t('main.bayCount', { count: bayCount })}
-              </Text>
-            </View>
-            <View
-              style={[
-                {
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: colors.brand[500],
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                },
-                shadows.fab,
-              ]}
-            >
-              <Icon name="arrowRight" size={20} stroke={2.4} color={colors.white} />
-            </View>
-          </View>
-        </Card>
+      {/* Up to 3 nearest carwashes, stacked. The full set is on the Wash map. */}
+      <View style={{ paddingHorizontal: 16, gap: 10 }}>
+        {items.map(({ carwash, distanceKm }) => (
+          <OpenNowCard key={carwash.id} carwash={carwash} distanceKm={distanceKm} />
+        ))}
       </View>
     </Section>
+  );
+}
+
+function OpenNowCard({ carwash, distanceKm }: NearbyCarwash) {
+  const { t } = useTranslation();
+  const primary = carwash.locations[0];
+  const bayCount = primary?.bayCount ?? 0;
+  return (
+    <Card onPress={() => router.push(`/tenant/${carwash.id}`)} padding={12}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 12,
+            backgroundColor: colors.lineSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <RemoteImage
+            uri={carwash.logoUrl}
+            style={{ width: 48, height: 48, borderRadius: 48 * 0.28 }}
+            fallback={<TenantMark name={carwash.brandName} size={48} />}
+          />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontFamily: 'Inter_700Bold',
+              fontSize: 11,
+              letterSpacing: 0.4,
+              textTransform: 'uppercase',
+              color: colors.success,
+            }}
+          >
+            {`${t('wash.open')} · ${formatDistance(distanceKm)}`}
+          </Text>
+          <Text
+            style={{
+              marginTop: 2,
+              fontFamily: 'Inter_700Bold',
+              fontSize: 16,
+              letterSpacing: -0.3,
+              color: colors.ink[900],
+            }}
+            numberOfLines={1}
+          >
+            {carwash.brandName}
+            {primary?.name ? ` · ${primary.name}` : ''}
+          </Text>
+          <Text
+            style={{
+              marginTop: 2,
+              fontFamily: 'Inter_400Regular',
+              fontSize: 12,
+              color: colors.ink[500],
+            }}
+          >
+            {t('main.bayCount', { count: bayCount })}
+          </Text>
+        </View>
+        <View
+          style={[
+            {
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: colors.brand[500],
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            shadows.fab,
+          ]}
+        >
+          <Icon name="arrowRight" size={20} stroke={2.4} color={colors.white} />
+        </View>
+      </View>
+    </Card>
   );
 }
 
@@ -957,21 +965,24 @@ function formatDistance(km: number): string {
   return `${km.toFixed(1).replace('.', ',')} km`;
 }
 
+/** The `limit` nearest carwashes (with a valid first location), nearest first. */
 function pickNearestOpen(
   carwashes: PublicCarwash[],
   userLoc: ReturnType<typeof useUserLocation>,
-): { carwash: PublicCarwash; distanceKm: number } | undefined {
-  if (userLoc.status !== 'ready') return undefined;
-  let best: { carwash: PublicCarwash; distanceKm: number } | undefined;
+  limit: number,
+): NearbyCarwash[] {
+  if (userLoc.status !== 'ready') return [];
+  const scored: NearbyCarwash[] = [];
   for (const cw of carwashes) {
     const loc = cw.locations[0];
     if (!loc) continue;
-    const dist =
+    const distanceKm =
       loc.distanceKm ??
       haversineKm(userLoc.location.lat, userLoc.location.lng, loc.latitude, loc.longitude);
-    if (!best || dist < best.distanceKm) best = { carwash: cw, distanceKm: dist };
+    scored.push({ carwash: cw, distanceKm });
   }
-  return best;
+  scored.sort((a, b) => a.distanceKm - b.distanceKm);
+  return scored.slice(0, limit);
 }
 
 function deriveRecentTenants(transactions: CustomerTx[]): RecentEntry[] {

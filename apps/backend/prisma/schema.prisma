@@ -139,7 +139,11 @@ model Tenant {
   ownerName         String
   ownerEmail        String
   ownerPhone        String
-  ePointMerchantId  String?
+  // ePoint merchant credentials. ePointMerchantId is the public_key (not
+  // secret). ePointPrivateKeyEnc holds the private_key encrypted with
+  // AES-256-GCM (format "v1.iv.tag.ct") — never stored or returned in plaintext.
+  ePointMerchantId    String?
+  ePointPrivateKeyEnc String? @db.Text
   themeColor        String       @default("#0E7AE7")
   logoUrl           String?
   descriptionAz     String?      @db.Text
@@ -163,8 +167,10 @@ model Tenant {
   subscriptions Subscription[]
   transactions  Transaction[]
   bays          Bay[]
-  favorites     Favorite[]
-  featured      FeaturedTenant?
+  favorites      Favorite[]
+  featured       FeaturedTenant?
+  savedCards     SavedCard[]
+  hardwareEvents HardwareEvent[]
 
   @@index([status])
   @@index([deletedAt])
@@ -284,10 +290,15 @@ model Bay {
   qrShortId          String    @unique
   status             BayStatus @default(active)
 
+  // Hardware bridge — обновляется при каждом heartbeat от Pico
+  lastSeenAt     DateTime? // когда Pico последний раз вышел на связь
+  lastRelayState Json?     // snapshot реле { fn2: 0, fn3: 1, ... }
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  transactions Transaction[]
+  transactions   Transaction[]
+  hardwareEvents HardwareEvent[]
 
   @@index([locationId])
   @@index([tenantId])
@@ -364,13 +375,19 @@ model SavedCard {
   id          String    @id @default(cuid())
   customerId  String
   customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  // ePoint card tokens are PER-MERCHANT, so a saved card is scoped to the
+  // carwash (tenant) whose ePoint account tokenized it. A card saved at one
+  // carwash cannot be charged by another.
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ePointToken String    @unique
   brand       CardBrand @default(unknown)
   lastFour    String
   isDefault   Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
-  @@index([customerId])
+  @@index([customerId, tenantId])
+  @@index([tenantId])
   @@map("saved_cards")
 }
 
@@ -404,6 +421,7 @@ enum PaymentMethod {
   card
   apple_pay
   google_pay
+  cash // купюроприёмник (offline payment через Pico)
 }
 
 model Transaction {
@@ -434,6 +452,32 @@ model Transaction {
   @@index([bayId, createdAt(sort: Desc)])
   @@index([status])
   @@map("transactions")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// HARDWARE EVENTS (ежедневный отчёт от Pico)
+// ════════════════════════════════════════════════════════════════════════════
+
+model HardwareEvent {
+  id              String   @id @default(cuid())
+  bayId           String
+  bay             Bay      @relation(fields: [bayId], references: [id], onDelete: Restrict)
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  eventType       String   // "cash" | "online" | "usage" | "anomaly"
+  amountAzn       Decimal? @db.Decimal(10, 2)
+  pulses          Int?
+  txId            String?
+  programName     String?
+  durationSeconds Int?
+  relayCombo      String[]
+  reportDate      String   // "YYYY-MM-DD"
+  rawTs           String   // ISO-таймстамп от Pico (Asia/Baku)
+  createdAt       DateTime @default(now())
+
+  @@index([bayId, reportDate])
+  @@index([tenantId, reportDate])
+  @@map("hardware_events")
 }
 
 // ════════════════════════════════════════════════════════════════════════════

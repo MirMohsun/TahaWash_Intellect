@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { BackButton, Icon, TenantMark, useDialog } from '../../src/components/ui';
@@ -19,7 +19,9 @@ import {
 } from '../../src/lib/charge-amount';
 import { lookupDevice } from '../../src/lib/devices-api';
 import { usePaymentMethods } from '../../src/hooks/use-me';
+import { useCreatePayment } from '../../src/hooks/use-payments';
 import type { PaymentMethod } from '../../src/lib/customers-api';
+import type { CreatePaymentMethod, CreatePaymentRequest } from '../../src/lib/payments-api';
 import { colors, shadows } from '../../src/theme/tokens';
 
 /**
@@ -139,6 +141,7 @@ function ChargeBody({ device }: ChargeBodyProps) {
     return list.find((m) => m.isDefault) ?? list[0] ?? null;
   }, [methodsQuery.data]);
   const dialog = useDialog();
+  const createPayment = useCreatePayment();
 
   const handleInc = () => {
     if (!canIncrement(tetri, bounds)) return;
@@ -157,19 +160,47 @@ function ChargeBody({ device }: ChargeBodyProps) {
     setTetri(chipTetri);
   };
 
-  const handleCharge = async () => {
+  const handleCharge = async (method: CreatePaymentMethod) => {
+    if (createPayment.isPending) return;
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Phase 2.8 wires the real ePoint flow. Until then we acknowledge
-    // the action so the user gets feedback that the button works.
-    await dialog.alert({
-      title: t('charge.paymentComingTitle'),
-      message: t('charge.paymentComingBody', {
-        amount: formatTetri(tetri),
-        bay: device.bay.name,
-      }),
-      confirmLabel: t('common.done'),
-    });
-    router.back();
+    const amount = (tetri / 100).toFixed(2);
+    const base = { qrShortId: device.bay.qrShortId, amount };
+    const req: CreatePaymentRequest =
+      method === 'saved_card' && card
+        ? { ...base, method: 'saved_card', cardId: card.id }
+        : method === 'new_card'
+          ? { ...base, method: 'new_card', saveCard: true }
+          : { ...base, method }; // apple_pay | google_pay
+
+    try {
+      const res = await createPayment.mutateAsync(req);
+      if (res.status === 'declined') {
+        await dialog.alert({
+          title: t('charge.declinedTitle', { defaultValue: 'Payment declined' }),
+          message:
+            res.message ??
+            t('charge.declinedBody', {
+              defaultValue: 'Your payment could not be completed. Please try another method.',
+            }),
+          confirmLabel: t('common.done'),
+        });
+        return;
+      }
+      // authorized (saved card) → poll; redirect → open the URL in a WebView.
+      const url = res.redirectUrl ?? res.widgetUrl;
+      router.push({
+        pathname: '/payment/[id]',
+        params: { id: res.transactionId, ...(url ? { url: encodeURIComponent(url) } : {}) },
+      });
+    } catch {
+      await dialog.alert({
+        title: t('charge.payErrorTitle', { defaultValue: 'Something went wrong' }),
+        message: t('charge.payErrorBody', {
+          defaultValue: "We couldn't start your payment. Please try again.",
+        }),
+        confirmLabel: t('common.done'),
+      });
+    }
   };
 
   return (
@@ -290,7 +321,8 @@ function ChargeBody({ device }: ChargeBodyProps) {
           reliably under New Arch / Fabric. */}
       <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
         <Pressable
-          onPress={handleCharge}
+          onPress={() => void handleCharge(card ? 'saved_card' : 'new_card')}
+          disabled={createPayment.isPending}
           android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
           style={[
             {
@@ -354,18 +386,70 @@ function ChargeBody({ device }: ChargeBodyProps) {
           </View>
 
           {/* Action + amount */}
-          <Text
-            numberOfLines={1}
+          {createPayment.isPending ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: 'Inter_800ExtraBold',
+                fontSize: 18,
+                color: colors.white,
+                letterSpacing: -0.3,
+              }}
+            >
+              {t('charge.payAction', { amount: formatTetri(tetri) })}
+            </Text>
+          )}
+        </Pressable>
+
+        {/* Alternative payment methods — wallet (Apple/Google Pay) + new card */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+          <Pressable
+            onPress={() => void handleCharge(Platform.OS === 'ios' ? 'apple_pay' : 'google_pay')}
+            disabled={createPayment.isPending}
+            android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
             style={{
-              fontFamily: 'Inter_800ExtraBold',
-              fontSize: 18,
-              color: colors.white,
-              letterSpacing: -0.3,
+              flex: 1,
+              height: 48,
+              borderRadius: 999,
+              borderWidth: 1.5,
+              borderColor: colors.line,
+              backgroundColor: colors.bgElev,
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
             }}
           >
-            {t('charge.payAction', { amount: formatTetri(tetri) })}
-          </Text>
-        </Pressable>
+            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 14, color: colors.ink[900] }}>
+              {Platform.OS === 'ios'
+                ? t('charge.applePay', { defaultValue: 'Apple Pay' })
+                : t('charge.googlePay', { defaultValue: 'Google Pay' })}
+            </Text>
+          </Pressable>
+          {card ? (
+            <Pressable
+              onPress={() => void handleCharge('new_card')}
+              disabled={createPayment.isPending}
+              android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+              style={{
+                flex: 1,
+                height: 48,
+                borderRadius: 999,
+                borderWidth: 1.5,
+                borderColor: colors.line,
+                backgroundColor: colors.bgElev,
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 14, color: colors.ink[900] }}>
+                {t('charge.newCard', { defaultValue: 'New card' })}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         <Text
           style={{

@@ -65,6 +65,7 @@
       "locCta": "Allow",
       "granted": "Allowed",
       "denied": "Skipped",
+      "openSettings": "Open Settings",
       "changeLater": "You can change this any time in Profile."
     },
     "intro": {
@@ -179,6 +180,7 @@
   },
   "tenant": {
     "getDirections": "Get directions",
+    "directionsVia": "Get directions with",
     "address": "Address",
     "openInMaps": "Tap to open in Maps",
     "workingHours": "Working hours",
@@ -373,6 +375,7 @@
       "branding": "Branding",
       "businessProfile": "Business profile",
       "subscription": "Subscription",
+      "payments": "Payments",
       "account": "Account"
     },
     "notifications": {

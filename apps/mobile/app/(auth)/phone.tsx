@@ -6,12 +6,14 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Logo } from '../../src/components/brand/logo';
 import { Button } from '../../src/components/ui';
 import { useAuthStore } from '../../src/store/auth';
@@ -272,41 +274,48 @@ export default function PhoneScreen() {
           {/* T&C hint. marginTop:'auto' pushes it to the bottom of the scroll
               content — visible at the screen edge when keyboard is closed,
               tight under the button when keyboard is open. */}
-          <Text
+          {/* T&C footer. Each link is its OWN Pressable (with hitSlop) in a
+              wrapping row — nested <Text onPress> taps are unreliable on RN's
+              New Architecture, which is why only part of the line responded. */}
+          <View
             style={{
               marginTop: 'auto',
               paddingTop: 24,
-              textAlign: 'center',
-              fontFamily: 'Inter_400Regular',
-              fontSize: 12,
-              lineHeight: 18,
-              color: colors.ink[400],
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'center',
               paddingHorizontal: 4,
             }}
           >
-            {t('auth.phone.termsHintPrefix')}{' '}
-            <Text
-              style={{ color: colors.ink[700], fontFamily: 'Inter_600SemiBold' }}
-              onPress={() => router.push('/legal/terms')}
-            >
-              {t('auth.phone.terms')}
-            </Text>
-            {' '}
-            {t('auth.phone.termsHintAnd')}
-            {' '}
-            <Text
-              style={{ color: colors.ink[700], fontFamily: 'Inter_600SemiBold' }}
-              onPress={() => router.push('/legal/privacy')}
-            >
-              {t('auth.phone.privacy')}
-            </Text>
-            .
-          </Text>
+            <Text style={TERMS_TEXT}>{t('auth.phone.termsHintPrefix')} </Text>
+            <Pressable onPress={() => router.push('/legal/terms')} hitSlop={10}>
+              <Text style={TERMS_LINK}>{t('auth.phone.terms')}</Text>
+            </Pressable>
+            <Text style={TERMS_TEXT}> {t('auth.phone.termsHintAnd')} </Text>
+            <Pressable onPress={() => router.push('/legal/privacy')} hitSlop={10}>
+              <Text style={TERMS_LINK}>{t('auth.phone.privacy')}</Text>
+            </Pressable>
+            <Text style={TERMS_TEXT}>.</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const TERMS_TEXT = {
+  fontFamily: 'Inter_400Regular' as const,
+  fontSize: 12,
+  lineHeight: 18,
+  color: colors.ink[400],
+};
+const TERMS_LINK = {
+  fontFamily: 'Inter_600SemiBold' as const,
+  fontSize: 12,
+  lineHeight: 18,
+  color: colors.brand[600],
+};
 
 /** Format the typed local digits as "XX XXX XX XX" while user types. */
 function formatLocalAsTyped(local: string): string {
@@ -317,21 +326,28 @@ function formatLocalAsTyped(local: string): string {
   return `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 7)} ${d.slice(7)}`;
 }
 
-/** Three horizontal bars of the AZ flag (green / red / blue). */
+/**
+ * Azerbaijan flag — three horizontal bands (blue / red / green) with the
+ * white crescent and eight-pointed star centred on the red band. Drawn as SVG
+ * so the crescent + star stay crisp at this small chip size. (The previous
+ * version was three plain bars in the wrong order and missing the emblem.)
+ */
 function AzFlag() {
   return (
-    <View
-      style={{
-        width: 22,
-        height: 16,
-        borderRadius: 2,
-        overflow: 'hidden',
-        flexDirection: 'column',
-      }}
-    >
-      <View style={{ flex: 1, backgroundColor: '#3F9C35' }} />
-      <View style={{ flex: 1, backgroundColor: '#ED2939' }} />
-      <View style={{ flex: 1, backgroundColor: '#00B5E2' }} />
+    <View style={{ width: 24, height: 16, borderRadius: 3, overflow: 'hidden' }}>
+      <Svg width={24} height={16} viewBox="0 0 24 16">
+        <Rect x={0} y={0} width={24} height={5.34} fill="#0098C3" />
+        <Rect x={0} y={5.33} width={24} height={5.34} fill="#EF3340" />
+        <Rect x={0} y={10.66} width={24} height={5.34} fill="#3F9C35" />
+        {/* White crescent = a white disc with an offset red disc cut out. */}
+        <Circle cx={10.5} cy={8} r={3} fill="#FFFFFF" />
+        <Circle cx={11.8} cy={8} r={2.5} fill="#EF3340" />
+        {/* Eight-pointed star. */}
+        <Path
+          d="M14.2 6.1 L14.5 7.28 L15.54 6.66 L14.92 7.7 L16.1 8 L14.92 8.3 L15.54 9.34 L14.5 8.72 L14.2 9.9 L13.9 8.72 L12.86 9.34 L13.48 8.3 L12.3 8 L13.48 7.7 L12.86 6.66 L13.9 7.28 Z"
+          fill="#FFFFFF"
+        />
+      </Svg>
     </View>
   );
 }

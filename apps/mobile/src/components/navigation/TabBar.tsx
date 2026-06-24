@@ -169,7 +169,21 @@ function RegularTab({ icon, label, focused, onPress }: RegularTabProps) {
       accessibilityLabel={label}
       style={{ flex: 1, alignItems: 'center', gap: 4, paddingVertical: 2 }}
     >
-      <Icon name={icon} size={24} stroke={focused ? 2.1 : 1.75} color={color} />
+      {/* Soft brand pill behind the active tab's icon — a Material-3-style
+          selection cue. Same footprint on every tab (transparent when
+          inactive) so the row stays vertically aligned. */}
+      <View
+        style={{
+          height: 30,
+          paddingHorizontal: 16,
+          borderRadius: 15,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: focused ? 'rgba(14,122,231,0.12)' : 'transparent',
+        }}
+      >
+        <Icon name={icon} size={23} stroke={focused ? 2.1 : 1.8} color={color} />
+      </View>
       <Text
         style={{
           fontFamily: focused ? 'Inter_600SemiBold' : 'Inter_500Medium',

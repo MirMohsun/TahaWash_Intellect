@@ -30,6 +30,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   /**
+   * Прямой доступ без tenant-скоупинга.
+   * Использовать ТОЛЬКО в:
+   *   - MQTT-обработчиках (hardware listener) — нет HTTP-контекста
+   *   - Scheduled jobs (cron) — нет актора
+   *   - Super-admin запросах (уже оборачиваются в withBypass)
+   */
+  get unscoped(): PrismaClient {
+    return this as unknown as PrismaClient;
+  }
+
+  /**
    * The scoped client. Use this for ALL business-data access — it enforces
    * tenant/customer scoping via the extension.
    *

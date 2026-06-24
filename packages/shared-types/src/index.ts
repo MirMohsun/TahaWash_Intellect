@@ -16,3 +16,4 @@ export * from './promo';
 export * from './push';
 export * from './tenant';
 export * from './transaction';
+export * from './hardware';

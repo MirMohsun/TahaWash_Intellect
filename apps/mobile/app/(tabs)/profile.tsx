@@ -232,6 +232,7 @@ export default function ProfileTab() {
             iconBg={colors.errorSoft}
             iconFg={colors.error}
             chevron={false}
+            centered
             onPress={() => router.push('/profile/delete-account')}
           />
         </SettingsGroup>
@@ -340,6 +341,8 @@ interface SettingsRowProps {
   iconBg?: string;
   iconFg?: string;
   titleColor?: string;
+  /** Center the icon+title as a group (used by the standalone Delete row). */
+  centered?: boolean;
   onPress?: () => void;
 }
 
@@ -351,6 +354,7 @@ function SettingsRow({
   iconBg = colors.brand[50],
   iconFg = colors.brand[600],
   titleColor = colors.ink[900],
+  centered = false,
   onPress,
 }: SettingsRowProps) {
   return (
@@ -359,6 +363,7 @@ function SettingsRow({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: centered ? 'center' : 'flex-start',
           paddingVertical: 14,
           paddingHorizontal: 16,
           gap: 12,
@@ -379,7 +384,7 @@ function SettingsRow({
         </View>
         <Text
           style={{
-            flex: 1,
+            flex: centered ? 0 : 1,
             fontFamily: 'Inter_600SemiBold',
             fontSize: 15,
             color: titleColor,

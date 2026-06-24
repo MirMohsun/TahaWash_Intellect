@@ -356,7 +356,11 @@ function ScannerErrorState({ code, onRetry, onClose }: ErrorStateProps) {
           {t(bodyKey)}
         </Text>
         <View style={{ height: 8 }} />
-        <Button onPress={onRetry}>{t('scanner.tryAgain')}</Button>
+        {/* alignSelf:center — Button defaults to alignSelf:'flex-start', which
+            otherwise pulls it to the left of this centered column. */}
+        <Button onPress={onRetry} style={{ alignSelf: 'center' }}>
+          {t('scanner.tryAgain')}
+        </Button>
         <Pressable onPress={onClose} hitSlop={8}>
           <Text
             style={{

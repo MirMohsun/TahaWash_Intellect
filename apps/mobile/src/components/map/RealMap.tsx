@@ -1,7 +1,7 @@
-import Mapbox, { Camera, MapView, PointAnnotation, UserLocation } from '@rnmapbox/maps';
+import Mapbox, { Camera, MapView, MarkerView, PointAnnotation, UserLocation } from '@rnmapbox/maps';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Image } from 'expo-image';
+import { Pressable, Text, View } from 'react-native';
 import { haversineKm } from '../../hooks/use-user-location';
 import { colors } from '../../theme/tokens';
 import type { MapPin } from './PlaceholderMap';
@@ -167,18 +167,19 @@ export function RealMap({
 
         {clusters.map((c) =>
           c.kind === 'single' ? (
-            <PointAnnotation
+            // MarkerView renders live RN views; PointAnnotation snapshots them
+            // to a bitmap on Android, which showed the image markers blank
+            // (white) because the PNG hadn't loaded when the snapshot was taken.
+            <MarkerView
               key={c.pin.id}
-              id={c.pin.id}
               coordinate={[c.pin.longitude, c.pin.latitude]}
-              onSelected={() => onPinPress?.(c.pin.id)}
               anchor={{ x: 0.5, y: 1 }}
+              allowOverlap
             >
-              <BrandPin
-                themeColor={c.pin.themeColor ?? colors.brand[500]}
-                active={c.pin.id === activePinId}
-              />
-            </PointAnnotation>
+              <Pressable onPress={() => onPinPress?.(c.pin.id)} hitSlop={6}>
+                <BrandPin active={c.pin.id === activePinId} />
+              </Pressable>
+            </MarkerView>
           ) : (
             <PointAnnotation
               key={c.id}
@@ -205,34 +206,60 @@ export function RealMap({
  * Active pin is enlarged and uses the brand color for the inner circle
  * instead of white, so the selection state reads at a glance.
  */
-function BrandPin({ themeColor, active }: { themeColor: string; active: boolean }) {
-  const size = active ? 52 : 44;
-  const ratio = size / 44; // base width 44
-  const w = Math.round(44 * ratio);
-  const h = Math.round(54 * ratio);
+/** Static brand power-washing marker image (rendered un-clipped; see contentFit). */
+const POWER_WASHING = require('../../../assets/power-washing_small.png');
+
+/**
+ * Carwash map marker — a white round badge carrying the brand power-washing
+ * icon, with a small pointer underneath that anchors it to the coordinate. The
+ * image uses contentFit:'contain' with padding so its edges are never clipped.
+ * The active marker enlarges and gains a brand-colored ring + pointer.
+ */
+function BrandPin({ active }: { active: boolean }) {
+  const d = active ? 52 : 44; // badge diameter
   return (
-    <View style={{ width: w, height: h }}>
-      <Svg width={w} height={h} viewBox="0 0 44 54">
-        <Path
-          d="M22 0C9.85 0 0 9.85 0 22c0 14 18 30 22 32 4-2 22-18 22-32C44 9.85 34.15 0 22 0z"
-          fill={active ? themeColor : '#FFFFFF'}
-          stroke={active ? darken(themeColor) : 'rgba(0,0,0,0.18)'}
-          strokeWidth={1.5}
+    <View style={{ alignItems: 'center' }}>
+      <View
+        style={{
+          width: d,
+          height: d,
+          borderRadius: d / 2,
+          backgroundColor: '#FFFFFF',
+          borderWidth: active ? 2.5 : 1.5,
+          borderColor: active ? colors.brand[500] : 'rgba(0,0,0,0.10)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          // MarkerView renders live views, so a normal shadow is safe (no
+          // PointAnnotation snapshot black-box artifact).
+          shadowColor: '#14181F',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 4,
+          elevation: 5,
+        }}
+      >
+        <Image
+          source={POWER_WASHING}
+          style={{ width: d * 0.6, height: d * 0.6 }}
+          contentFit="contain"
         />
-        {/* Inner circle: brand color when active, themeColor when passive */}
-        <Circle cx={22} cy={20} r={11} fill={active ? '#FFFFFF' : themeColor} />
-      </Svg>
+      </View>
+      {/* Pointer triangle — its bottom tip sits on the coordinate (anchor y:1). */}
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          marginTop: -1,
+          borderLeftWidth: 6,
+          borderRightWidth: 6,
+          borderTopWidth: 9,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderTopColor: active ? colors.brand[500] : '#FFFFFF',
+        }}
+      />
     </View>
   );
-}
-
-/** Multiply each channel by 0.8 — quick non-OKLCH darken for the stroke. */
-function darken(hex: string): string {
-  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return 'rgba(0,0,0,0.25)';
-  const r = Math.round(parseInt(hex.slice(1, 3), 16) * 0.8);
-  const g = Math.round(parseInt(hex.slice(3, 5), 16) * 0.8);
-  const b = Math.round(parseInt(hex.slice(5, 7), 16) * 0.8);
-  return `rgb(${r}, ${g}, ${b})`;
 }
 
 // ─── clustering ────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import {
   Building2,
   CalendarClock,
   Coins,
+  CreditCard,
   LayoutDashboard,
   MapPin,
   Palette,
@@ -66,6 +67,12 @@ const NAV: NavItem[] = [
     match: '/subscription',
     labelKey: 'tenantAdmin.nav.subscription',
     icon: CalendarClock,
+  },
+  {
+    to: '/payments',
+    match: '/payments',
+    labelKey: 'tenantAdmin.nav.payments',
+    icon: CreditCard,
   },
   {
     to: '/account',

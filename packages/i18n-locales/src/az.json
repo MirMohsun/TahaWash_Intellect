@@ -65,6 +65,7 @@
       "locCta": "İcazə ver",
       "granted": "İcazə verildi",
       "denied": "İmtina",
+      "openSettings": "Parametrləri aç",
       "changeLater": "İstənilən vaxt Profil bölməsindən dəyişə bilərsiniz."
     },
     "intro": {
@@ -318,6 +319,7 @@
   },
   "tenant": {
     "getDirections": "Marşrut al",
+    "directionsVia": "Naviqasiya tətbiqini seçin",
     "address": "Ünvan",
     "openInMaps": "Xəritədə açmaq üçün toxun",
     "workingHours": "İş saatları",
@@ -373,6 +375,7 @@
       "branding": "Brend",
       "businessProfile": "Biznes profili",
       "subscription": "Abunəlik",
+      "payments": "Ödənişlər",
       "account": "Hesab"
     },
     "notifications": {
