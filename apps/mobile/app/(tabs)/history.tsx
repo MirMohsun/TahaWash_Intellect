@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +25,7 @@ import {
 } from '../../src/lib/baku-date';
 import { formatTetri, parseAznToTetri } from '../../src/lib/charge-amount';
 import type { CustomerTx, CustomerTxStatus } from '../../src/lib/transactions-api';
-import { colors } from '../../src/theme/tokens';
+import { colors, gradients, shadows } from '../../src/theme/tokens';
 
 /**
  * A8.1 History tab — 1:1 port of Design_Mobile_App/app/screens-c.jsx →
@@ -148,13 +149,20 @@ export default function HistoryTab() {
         {/* Spend card + mini bar chart */}
         {!txQuery.isLoading && !isEmpty ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-            <Card
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-              padding={14}
+            <LinearGradient
+              colors={gradients.avatar as unknown as readonly [string, string, ...string[]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 16,
+                  borderRadius: 16,
+                },
+                shadows.fab,
+              ]}
             >
               <View>
                 <Text
@@ -163,7 +171,7 @@ export default function HistoryTab() {
                     fontSize: 11,
                     letterSpacing: 0.4,
                     textTransform: 'uppercase',
-                    color: colors.ink[500],
+                    color: 'rgba(255,255,255,0.82)',
                   }}
                 >
                   {t('history.spentThisMonth')}
@@ -174,15 +182,15 @@ export default function HistoryTab() {
                     fontFamily: 'Inter_800ExtraBold',
                     fontSize: 22,
                     letterSpacing: -0.6,
-                    color: colors.ink[900],
+                    color: colors.white,
                     fontVariant: ['tabular-nums'],
                   }}
                 >
                   {formatTetri(monthSpendTetri)}
                 </Text>
               </View>
-              <MiniBarChart data={barData} />
-            </Card>
+              <MiniBarChart data={barData} onBrand />
+            </LinearGradient>
           </View>
         ) : null}
 
@@ -380,7 +388,7 @@ function HistoryRow({ tx }: { tx: CustomerTx }) {
 
 // ─── bar chart ───────────────────────────────────────────────
 
-function MiniBarChart({ data }: { data: number[] }) {
+function MiniBarChart({ data, onBrand = false }: { data: number[]; onBrand?: boolean }) {
   // Normalize to 4-36pt height. Max bar in design is 36pt; preserve
   // proportions but clamp at min 4pt so empty days still render a tick.
   const max = Math.max(1, ...data);
@@ -389,17 +397,16 @@ function MiniBarChart({ data }: { data: number[] }) {
       {data.map((value, i) => {
         const height = Math.max(4, Math.round((value / max) * 36));
         const isToday = i === data.length - 1;
-        return (
-          <View
-            key={i}
-            style={{
-              width: 6,
-              height,
-              borderRadius: 3,
-              backgroundColor: isToday ? colors.brand[500] : colors.brand[100],
-            }}
-          />
-        );
+        // On the brand-gradient card the bars go white so they read against
+        // the blue; on a plain white card they use the brand palette.
+        const backgroundColor = onBrand
+          ? isToday
+            ? '#FFFFFF'
+            : 'rgba(255,255,255,0.45)'
+          : isToday
+            ? colors.brand[500]
+            : colors.brand[100];
+        return <View key={i} style={{ width: 6, height, borderRadius: 3, backgroundColor }} />;
       })}
     </View>
   );

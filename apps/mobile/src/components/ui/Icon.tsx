@@ -94,16 +94,17 @@ export function Icon({
     case 'home':
       return (
         <Svg {...common}>
-          <Path d="M3 11l9-7 9 7" />
-          <Path d="M5 10v10h14V10" />
+          <Path d="M3 10.6 12 3l9 7.6" />
+          <Path d="M5.5 9.6V20a1 1 0 0 0 1 1H17.5a1 1 0 0 0 1-1V9.6" />
+          <Path d="M9.5 21v-5.2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V21" />
         </Svg>
       );
     case 'map':
       return (
         <Svg {...common}>
-          <Path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z" />
-          <Path d="M9 4v16" />
-          <Path d="M15 6v16" />
+          <Path d="M9 4 3.6 6.1A1 1 0 0 0 3 7v12.1a.6.6 0 0 0 .82.56L9 18l6 3 5.4-2.1A1 1 0 0 0 21 18V5.9a.6.6 0 0 0-.82-.56L15 6 9 4Z" />
+          <Path d="M9 4v14" />
+          <Path d="M15 6v15" />
         </Svg>
       );
     case 'qr':
@@ -118,7 +119,6 @@ export function Icon({
           <Path d="M20 20v.01" />
         </Svg>
       );
-    case 'history':
     case 'clock':
       return (
         <Svg {...common}>
@@ -126,11 +126,19 @@ export function Icon({
           <Path d="M12 7v5l3 2" />
         </Svg>
       );
+    case 'history':
+      return (
+        <Svg {...common}>
+          <Path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <Path d="M3 3v5h5" />
+          <Path d="M12 7.5v4.5l4 2" />
+        </Svg>
+      );
     case 'user':
       return (
         <Svg {...common}>
-          <Circle cx="12" cy="8" r="4" />
-          <Path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
+          <Circle cx="12" cy="8" r="3.6" />
+          <Path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
         </Svg>
       );
     case 'search':

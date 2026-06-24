@@ -1,4 +1,6 @@
 import { formatAzPhone } from '@tahawash/shared-utils';
+import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -100,8 +102,9 @@ export default function OtpScreen() {
     setError(null);
     try {
       await verifyOtp(phone, code);
-      // Replace the auth stack with the permission flow.
-      router.replace('/(auth)/permissions');
+      // Returning users who've already granted location + notifications skip
+      // the permissions screen entirely (no flash) and land straight in the app.
+      router.replace((await permissionsAllGranted()) ? '/' : '/(auth)/permissions');
     } catch (err) {
       const errCode = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
       switch (errCode) {
@@ -365,6 +368,22 @@ export default function OtpScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+/**
+ * True only when BOTH foreground location and notifications are already
+ * granted — lets a returning user skip the permissions screen after login.
+ */
+async function permissionsAllGranted(): Promise<boolean> {
+  try {
+    const [loc, notif] = await Promise.all([
+      Location.getForegroundPermissionsAsync(),
+      Notifications.getPermissionsAsync(),
+    ]);
+    return loc.status === 'granted' && notif.status === 'granted';
+  } catch {
+    return false;
+  }
 }
 
 function formatCountdown(seconds: number): string {

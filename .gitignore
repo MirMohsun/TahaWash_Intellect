@@ -120,3 +120,9 @@ eas-log.txt
 manifest.bin
 .patch-tmp/
 preview-assets/
+
+# Design references / mockups — kept LOCALLY for provenance (the mobile/admin
+# screens were ported 1:1 from these) but not needed in the repo: nothing
+# imports them, they're not workspace packages, and CI already ignores them.
+/Design_Mobile_App/
+/Design_Admin_Panels/

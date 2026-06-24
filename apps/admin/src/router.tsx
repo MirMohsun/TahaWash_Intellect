@@ -8,6 +8,7 @@ import { LoginPage } from '@/features/auth/login-page';
 import { ResetPasswordPage } from '@/features/auth/reset-password-page';
 import { AccountSettingsPage } from '@/features/account/account-settings-page';
 import { BrandingPage } from '@/features/branding/branding-page';
+import { PaymentCredentialsPage } from '@/features/payments/payment-credentials-page';
 import { BusinessProfilePage } from '@/features/business-profile/business-profile-page';
 import { FinancialsPage } from '@/features/financials/financials-page';
 import { LocationFormPage } from '@/features/locations/location-form-page';
@@ -150,6 +151,12 @@ const accountRoute = createRoute({
   getParentRoute: () => protectedLayoutRoute,
   path: '/account',
   component: AccountSettingsPage,
+});
+
+const paymentCredentialsRoute = createRoute({
+  getParentRoute: () => protectedLayoutRoute,
+  path: '/payments',
+  component: PaymentCredentialsPage,
 });
 
 const indexRoute = createRoute({
@@ -318,6 +325,7 @@ const routeTree = rootRoute.addChildren([
     brandingRoute,
     businessProfileRoute,
     subscriptionRoute,
+    paymentCredentialsRoute,
     accountRoute,
   ]),
   superAdminProtectedLayoutRoute.addChildren([

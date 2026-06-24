@@ -1,6 +1,8 @@
 import { createApiClient } from '@tahawash/api-client';
+import axios from 'axios';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { fetchAdapter } from './fetch-adapter';
 import { tokenStore } from './token-store';
 
 /**
@@ -48,6 +50,16 @@ export const api = createApiClient({
     'X-App-Platform': platform,
   },
 });
+
+// Route ALL mobile HTTP through React Native's native `fetch` instead of
+// axios's XHR adapter. On RN 0.76 + New Architecture the XHR adapter can lose
+// responses (request reaches the server, 200 returned, but the load callback
+// never fires → ERR_NETWORK) — `fetch` uses a reliable bridge path. See
+// fetch-adapter.ts. We set it on both the app client AND the bare axios
+// default so the api-client's 401-refresh call (which uses plain `axios.post`)
+// goes through the same path.
+api.defaults.adapter = fetchAdapter;
+axios.defaults.adapter = fetchAdapter;
 
 /** What this build identifies as. Re-exported for use in the version-check flow. */
 export const appMeta = {

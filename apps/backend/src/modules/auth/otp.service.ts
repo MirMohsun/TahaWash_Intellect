@@ -5,7 +5,11 @@ import { SmsService } from '../sms/sms.service';
 
 /** Spec-locked constants (see project memory). */
 const OTP_LENGTH = 6;
-const OTP_EXPIRY_MINUTES = 5;
+// 10 min (was 5). While SMS is mock, the code is fetched from server logs —
+// a slow round-trip that the original 5-min window cut too close, so freshly
+// typed codes could lapse mid-entry. 10 min is still a safe OTP lifetime and
+// matches the dev/testing loosening already applied to the limits below.
+const OTP_EXPIRY_MINUTES = 10;
 const MAX_VERIFY_ATTEMPTS = 10; // per OTP row (was 5 — too tight during dev/testing)
 const MAX_REQUESTS_PER_HOUR = 50; // per phone (was 5 — too tight during dev/testing)
 
@@ -48,15 +52,43 @@ export class OtpService {
   }
 
   /**
-   * Verify a code against the latest non-consumed OTP for this phone.
-   * On success, marks the OTP consumed and returns true.
+   * Verify a code against ANY currently-valid OTP for this phone — i.e. any
+   * row that is unconsumed AND unexpired AND whose hash matches. On success,
+   * that row is marked consumed.
+   *
+   * Why "any" and not just the newest: a phone can have several OTPs
+   * outstanding at once (the user re-entered their number, tapped resend, or
+   * — in dev — several codes are sitting in the server log). Matching only the
+   * single newest row meant every other genuinely-issued, unexpired code was
+   * rejected as OTP_INVALID ("the code is incorrect"), which is confusing and
+   * wrong: the user typed a code we really did send. Accepting any live code
+   * fixes that. Lockout still applies (wrong guesses increment the newest
+   * row's counter), and codes still expire after 5 minutes.
    *
    * Failure modes (all throw BadRequestException):
-   *  - no OTP issued or all expired
-   *  - max attempts exceeded
-   *  - wrong code (increments attempts)
+   *  - no OTP ever issued                       → OTP_NOT_FOUND
+   *  - all outstanding OTPs expired             → OTP_EXPIRED
+   *  - newest OTP is attempt-locked             → OTP_LOCKED
+   *  - a live OTP exists but the code is wrong  → OTP_INVALID (increments attempts)
    */
   async verifyOtp(phone: string, code: string): Promise<void> {
+    const now = new Date();
+    const codeHash = hashOtp(code);
+
+    // Happy path: does the typed code match any unconsumed, unexpired OTP?
+    const match = await this.prisma.otpCode.findFirst({
+      where: { phone, consumedAt: null, expiresAt: { gt: now }, codeHash },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (match) {
+      await this.prisma.otpCode.update({
+        where: { id: match.id },
+        data: { consumedAt: now },
+      });
+      return;
+    }
+
+    // No match — produce a precise reason from the newest outstanding OTP.
     const latest = await this.prisma.otpCode.findFirst({
       where: { phone, consumedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -69,7 +101,7 @@ export class OtpService {
       });
     }
 
-    if (latest.expiresAt < new Date()) {
+    if (latest.expiresAt < now) {
       throw new BadRequestException({
         code: 'OTP_EXPIRED',
         message: 'OTP has expired. Request a new one.',
@@ -83,22 +115,14 @@ export class OtpService {
       });
     }
 
-    if (hashOtp(code) !== latest.codeHash) {
-      // Increment attempt counter and reject.
-      await this.prisma.otpCode.update({
-        where: { id: latest.id },
-        data: { attemptsCount: { increment: 1 } },
-      });
-      throw new BadRequestException({
-        code: 'OTP_INVALID',
-        message: 'The code is incorrect.',
-      });
-    }
-
-    // Success — mark consumed so it can't be reused.
+    // A live OTP exists but nothing matched the typed code — count the attempt.
     await this.prisma.otpCode.update({
       where: { id: latest.id },
-      data: { consumedAt: new Date() },
+      data: { attemptsCount: { increment: 1 } },
+    });
+    throw new BadRequestException({
+      code: 'OTP_INVALID',
+      message: 'The code is incorrect.',
     });
   }
 }

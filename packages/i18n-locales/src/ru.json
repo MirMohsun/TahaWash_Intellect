@@ -65,6 +65,7 @@
       "locCta": "Разрешить",
       "granted": "Разрешено",
       "denied": "Отклонено",
+      "openSettings": "Открыть настройки",
       "changeLater": "Можно изменить в любое время в Профиле."
     },
     "intro": {
@@ -183,6 +184,7 @@
   },
   "tenant": {
     "getDirections": "Маршрут",
+    "directionsVia": "Открыть маршрут в",
     "address": "Адрес",
     "openInMaps": "Нажмите, чтобы открыть в Картах",
     "workingHours": "Часы работы",
@@ -385,6 +387,7 @@
       "branding": "Бренд",
       "businessProfile": "Профиль бизнеса",
       "subscription": "Подписка",
+      "payments": "Платежи",
       "account": "Аккаунт"
     },
     "notifications": {
