@@ -151,7 +151,9 @@ model Tenant {
   descriptionEn     String?      @db.Text
   contactPhone      String?
   minChargeAmount   Decimal      @default("1.00") @db.Decimal(10, 2)
-  chargeStep        Decimal      @default("0.50") @db.Decimal(10, 2)
+  // Железо зачисляет только целые AZN (1 пачка импульсов = 1 AZN), поэтому
+  // шаг по умолчанию — целый. Дробный шаг создаёт суммы, которые Pico отклонит.
+  chargeStep        Decimal      @default("1.00") @db.Decimal(10, 2)
   status            TenantStatus @default(pending)
   subscriptionStart DateTime?
   subscriptionEnd   DateTime?

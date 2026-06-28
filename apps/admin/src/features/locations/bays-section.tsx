@@ -362,7 +362,10 @@ function InlineEdit({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') onSave();
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onSave();
+          }
           if (e.key === 'Escape') onCancel();
         }}
         className="h-8 max-w-xs"
@@ -455,6 +458,12 @@ function AddBayForm({ locationId }: { locationId: string }) {
             id="new-bay-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void submit();
+              }
+            }}
             placeholder={t('tenantAdmin.bays.namePlaceholder')}
             disabled={createMut.isPending}
           />
@@ -467,6 +476,12 @@ function AddBayForm({ locationId }: { locationId: string }) {
             id="new-bay-hardware"
             value={hardware}
             onChange={(e) => setHardware(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void submit();
+              }
+            }}
             placeholder={t('tenantAdmin.bays.hardwarePlaceholder')}
             disabled={createMut.isPending}
           />

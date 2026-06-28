@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { RequestContext } from '../../common/request-context';
 import type { Env } from '../../config/env.schema';
 import { PrismaService } from '../prisma/prisma.service';
+import { HardwareService } from '../hardware/hardware.service';
 import { CredentialCipherService } from './crypto/credential-cipher.service';
 import type { CreatePaymentDto, PaymentMethodChoice } from './dto/create-payment.dto';
 import { decodeData, verifySignature } from './epoint/epoint-signature.util';
@@ -66,6 +67,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
     private readonly cipher: CredentialCipherService,
+    private readonly hardware: HardwareService,
     @Inject(PAYMENT_PROVIDER_TOKEN) private readonly provider: PaymentProvider,
   ) {
     this.providerMode = this.config.get('PAYMENT_PROVIDER', { infer: true });
@@ -221,6 +223,8 @@ export class PaymentsService {
       where: { id: transactionId },
       data: { status: 'paid_crediting' },
     });
+    // Hardware: тот же путь, что у боевого платежа — публикуем кредит на Pico.
+    await this.enqueueBayCredit(transactionId);
     return { status: 'paid_crediting' };
   }
 
@@ -298,7 +302,9 @@ export class PaymentsService {
         if (cardId && txn.customerId) {
           await this.saveCardFromCallback(txn.customerId, tenantId, cardId, payload);
         }
-        // NEXT (Phase 5 — hardware): enqueue the bay-credit command here.
+        // Hardware: публикуем команду кредита на Pico; ACK двигает
+        // paid_crediting → paid_credited.
+        await this.enqueueBayCredit(orderId);
         this.logger.log(`ePoint callback: order ${orderId} paid → crediting.`);
       } else {
         await this.prisma.scoped.transaction.update({
@@ -372,8 +378,9 @@ export class PaymentsService {
         where: { id: transactionId },
         data: { status: 'paid_crediting', ePointReference: result.transactionId ?? null },
       });
-      // NEXT (Phase 5 — hardware): enqueue the bay-credit command here; the
-      // hardware ACK moves the txn paid_crediting → paid_credited.
+      // Hardware: публикуем команду кредита на Pico; ACK двигает
+      // paid_crediting → paid_credited.
+      await this.enqueueBayCredit(transactionId);
       this.logger.log(`Payment ${transactionId} authorized (saved card) → crediting.`);
       return { transactionId, status: 'authorized', message: 'Payment approved' };
     }
@@ -407,6 +414,78 @@ export class PaymentsService {
       redirectUrl: result.redirectUrl,
       widgetUrl: result.widgetUrl,
     };
+  }
+
+  /**
+   * Опубликовать команду кредита на Pico конкретного Bay.
+   *
+   * Вызывается СРАЗУ после перехода транзакции в `paid_crediting` (с карты,
+   * по вебхуку ePoint или из mock-complete). Дальше:
+   *   - Pico присылает ACK → HardwareListenerService двигает
+   *     paid_crediting → paid_credited / paid_hardware_error.
+   *   - Если ACK не пришёл за HARDWARE_ACK_TIMEOUT_S — HardwareAckTimeoutService
+   *     (cron) сам переведёт в paid_hardware_error.
+   *
+   * Best-effort: исключения наружу не бросаем (деньги уже списаны). Если у Bay
+   * нет hardwareIdentifier или сумма не целая — сразу paid_hardware_error.
+   * Если упала только публикация (брокер недоступен) — оставляем paid_crediting,
+   * добьёт cron-таймаут.
+   */
+  private async enqueueBayCredit(transactionId: string): Promise<void> {
+    await RequestContext.withBypass(async () => {
+      const txn = await this.prisma.unscoped.transaction.findUnique({
+        where: { id: transactionId },
+        select: { id: true, amountAzn: true, bayId: true },
+      });
+      if (!txn) {
+        this.logger.error(`enqueueBayCredit: transaction ${transactionId} not found`);
+        return;
+      }
+
+      const bay = await this.prisma.unscoped.bay.findUnique({
+        where: { id: txn.bayId },
+        select: { hardwareIdentifier: true },
+      });
+
+      // amountAzn — Decimal-строка ("2.00"). Железо принимает только целые AZN.
+      const cents = Math.round(Number(txn.amountAzn.toString()) * 100);
+      const azn = cents / 100;
+
+      if (!bay?.hardwareIdentifier) {
+        await this.failCrediting(transactionId, 'bay_has_no_hardware_identifier');
+        return;
+      }
+      if (cents <= 0 || cents % 100 !== 0) {
+        await this.failCrediting(transactionId, 'amount_not_whole_azn');
+        return;
+      }
+
+      try {
+        await this.hardware.publish(bay.hardwareIdentifier, {
+          type: 'credit',
+          txId: txn.id,
+          amount: azn,
+        });
+        this.logger.log(
+          `Credit command sent: tx=${txn.id} → ${bay.hardwareIdentifier} (${azn} AZN)`,
+        );
+      } catch (err) {
+        // Публикация не удалась (брокер недоступен). Транзакцию НЕ трогаем —
+        // оставляем paid_crediting, её добьёт ACK-timeout cron.
+        this.logger.error(
+          `Credit publish failed: tx=${txn.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    });
+  }
+
+  /** Перевести транзакцию в paid_hardware_error с указанной причиной. */
+  private async failCrediting(transactionId: string, reason: string): Promise<void> {
+    await this.prisma.unscoped.transaction.update({
+      where: { id: transactionId },
+      data: { status: 'paid_hardware_error', errorReason: reason },
+    });
+    this.logger.warn(`Transaction ${transactionId} → paid_hardware_error: ${reason}`);
   }
 
   private resolveCredentials(tenant: {
@@ -468,6 +547,15 @@ export class PaymentsService {
     const cents = Math.round(Number(raw) * 100);
     if (!Number.isFinite(cents) || cents <= 0) {
       throw new BadRequestException({ code: 'INVALID_AMOUNT' });
+    }
+    // Железо зачисляет ТОЛЬКО целые AZN (1 пачка импульсов = 1 AZN). Дробные
+    // суммы отклоняем здесь, ДО списания, чтобы не списать деньги за сумму,
+    // которую аппарат не сможет зачислить (иначе — refund-петля).
+    if (cents % 100 !== 0) {
+      throw new BadRequestException({
+        code: 'AMOUNT_NOT_WHOLE_AZN',
+        message: 'Amount must be a whole number of AZN.',
+      });
     }
     const minCents = Math.round(Number(String(tenant.minChargeAmount)) * 100);
     const stepCents = Math.round(Number(String(tenant.chargeStep)) * 100);

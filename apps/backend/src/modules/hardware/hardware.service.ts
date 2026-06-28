@@ -66,7 +66,12 @@ export class HardwareService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await new Promise<void>((resolve) => this.client.end(false, {}, resolve));
+    await new Promise<void>((resolve, reject) => {
+      this.client.end(false, {}, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
     this.logger.log('MQTT disconnected');
   }
 

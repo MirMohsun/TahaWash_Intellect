@@ -8,7 +8,11 @@ jest.spyOn(RequestContext, 'withBypass').mockImplementation((fn: () => unknown) 
 
 type Txn = { id: string; status: string; amountAzn: string; [k: string]: unknown };
 
-function makeHarness(opts?: { card?: Record<string, unknown> | null; bay?: Record<string, unknown> }) {
+function makeHarness(opts?: {
+  card?: Record<string, unknown> | null;
+  bay?: Record<string, unknown>;
+  tenant?: Record<string, unknown>;
+}) {
   const txns: Txn[] = [];
   let n = 0;
 
@@ -17,6 +21,7 @@ function makeHarness(opts?: { card?: Record<string, unknown> | null; bay?: Recor
     locationId: 'loc_1',
     name: 'Bay 1',
     status: 'active',
+    hardwareIdentifier: 'tahawash-wash-01',
     location: { id: 'loc_1', status: 'active', deletedAt: null },
     tenant: {
       id: 'ten_1',
@@ -24,11 +29,27 @@ function makeHarness(opts?: { card?: Record<string, unknown> | null; bay?: Recor
       status: 'active',
       deletedAt: null,
       minChargeAmount: '1.00',
-      chargeStep: '0.50',
+      // Whole-AZN step — hardware credits whole AZN only.
+      chargeStep: '1.00',
       ePointMerchantId: 'i000000001',
       ePointPrivateKeyEnc: 'enc',
+      ...opts?.tenant,
     },
     ...opts?.bay,
+  };
+
+  const transaction = {
+    create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      const t: Txn = { id: `txn_${++n}`, amountAzn: String(data.amountAzn), ...data } as Txn;
+      txns.push(t);
+      return { id: t.id };
+    }),
+    update: jest.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+      const t = txns.find((x) => x.id === where.id)!;
+      Object.assign(t, data);
+      return t;
+    }),
+    findUnique: jest.fn(async ({ where }: { where: { id: string } }) => txns.find((x) => x.id === where.id) ?? null),
   };
 
   const prisma = {
@@ -41,19 +62,12 @@ function makeHarness(opts?: { card?: Record<string, unknown> | null; bay?: Recor
             : { id: 'card_1', tenantId: 'ten_1', ePointToken: 'tok_abc', brand: 'visa', lastFour: '4242' },
         ),
       },
-      transaction: {
-        create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
-          const t: Txn = { id: `txn_${++n}`, amountAzn: String(data.amountAzn), ...data } as Txn;
-          txns.push(t);
-          return { id: t.id };
-        }),
-        update: jest.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
-          const t = txns.find((x) => x.id === where.id)!;
-          Object.assign(t, data);
-          return t;
-        }),
-        findUnique: jest.fn(async ({ where }: { where: { id: string } }) => txns.find((x) => x.id === where.id) ?? null),
-      },
+      transaction,
+    },
+    // enqueueBayCredit reads txn + bay via unscoped.
+    unscoped: {
+      transaction,
+      bay: { findUnique: jest.fn().mockResolvedValue({ hardwareIdentifier: activeBay.hardwareIdentifier }) },
     },
   };
 
@@ -61,22 +75,24 @@ function makeHarness(opts?: { card?: Record<string, unknown> | null; bay?: Recor
     get: (k: string) => (k === 'PAYMENT_PROVIDER' ? 'mock' : 'https://app.tahawash.az'),
   };
   const cipher = { decrypt: jest.fn(() => 'k'), encrypt: jest.fn(), isConfigured: () => true };
+  const hardware = { publish: jest.fn().mockResolvedValue(undefined) };
 
   const service = new PaymentsService(
     prisma as never,
     config as never,
     cipher as never,
+    hardware as never,
     new MockPaymentProvider(),
   );
-  return { service, prisma, txns };
+  return { service, prisma, txns, hardware };
 }
 
 const dto = (over: Partial<CreatePaymentDto>): CreatePaymentDto =>
-  ({ qrShortId: 'ABC123', amount: '2.50', method: 'new_card', ...over }) as CreatePaymentDto;
+  ({ qrShortId: 'ABC123', amount: '2.00', method: 'new_card', ...over }) as CreatePaymentDto;
 
 describe('PaymentsService', () => {
-  it('saved-card charge → authorized + transaction set to paid_crediting', async () => {
-    const { service, txns } = makeHarness();
+  it('saved-card charge → authorized + transaction set to paid_crediting + bay credited', async () => {
+    const { service, txns, hardware } = makeHarness();
     const res = await service.createPayment('cust_1', dto({ method: 'saved_card', cardId: 'card_1' }));
 
     expect(res.status).toBe('authorized');
@@ -84,15 +100,21 @@ describe('PaymentsService', () => {
     expect(txns[0]!.status).toBe('paid_crediting');
     expect(txns[0]!.customerId).toBe('cust_1');
     expect(txns[0]!.tenantId).toBe('ten_1');
+    // Credit command published to the bay's Pico (whole AZN → integer amount).
+    expect(hardware.publish).toHaveBeenCalledWith(
+      'tahawash-wash-01',
+      expect.objectContaining({ type: 'credit', amount: 2 }),
+    );
   });
 
-  it('new-card → redirect with a redirectUrl; transaction stays pending', async () => {
-    const { service, txns } = makeHarness();
+  it('new-card → redirect with a redirectUrl; transaction stays pending; no credit yet', async () => {
+    const { service, txns, hardware } = makeHarness();
     const res = await service.createPayment('cust_1', dto({ method: 'new_card' }));
 
     expect(res.status).toBe('redirect');
     expect(res.redirectUrl).toBeTruthy();
     expect(txns[0]!.status).toBe('pending');
+    expect(hardware.publish).not.toHaveBeenCalled();
   });
 
   it('apple_pay → redirect with a widgetUrl', async () => {
@@ -104,16 +126,16 @@ describe('PaymentsService', () => {
   });
 
   it('rejects an amount below the tenant minimum', async () => {
-    const { service } = makeHarness();
-    await expect(service.createPayment('cust_1', dto({ amount: '0.50' }))).rejects.toMatchObject({
+    const { service } = makeHarness({ tenant: { minChargeAmount: '3.00' } });
+    await expect(service.createPayment('cust_1', dto({ amount: '2.00' }))).rejects.toMatchObject({
       response: { code: 'AMOUNT_BELOW_MIN' },
     });
   });
 
-  it('rejects an amount not aligned to the charge step', async () => {
+  it('rejects a fractional (non-whole-AZN) amount — hardware credits whole AZN only', async () => {
     const { service } = makeHarness();
-    await expect(service.createPayment('cust_1', dto({ amount: '2.30' }))).rejects.toMatchObject({
-      response: { code: 'AMOUNT_NOT_ALIGNED' },
+    await expect(service.createPayment('cust_1', dto({ amount: '2.50' }))).rejects.toMatchObject({
+      response: { code: 'AMOUNT_NOT_WHOLE_AZN' },
     });
   });
 
@@ -133,11 +155,15 @@ describe('PaymentsService', () => {
     });
   });
 
-  it('mock-complete advances a pending redirect payment to paid_crediting', async () => {
-    const { service, txns } = makeHarness();
+  it('mock-complete advances a pending redirect payment to paid_crediting + credits the bay', async () => {
+    const { service, txns, hardware } = makeHarness();
     const res = await service.createPayment('cust_1', dto({ method: 'new_card' }));
     const done = await service.mockComplete('cust_1', res.transactionId);
     expect(done.status).toBe('paid_crediting');
     expect(txns[0]!.status).toBe('paid_crediting');
+    expect(hardware.publish).toHaveBeenCalledWith(
+      'tahawash-wash-01',
+      expect.objectContaining({ type: 'credit', amount: 2 }),
+    );
   });
 });
