@@ -72,6 +72,7 @@ const config: ExpoConfig = {
     favicon: './assets/favicon.png',
   },
   plugins: [
+    'expo-dev-client',
     'expo-router',
     'expo-font',
     'expo-secure-store',

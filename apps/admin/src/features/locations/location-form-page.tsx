@@ -365,14 +365,15 @@ export function LocationFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 : t('tenantAdmin.locations.create')}
           </Button>
         </div>
+      </form>
 
-        {/* Edit-only: bays inline */}
-        {isEdit && locationId && existing.data && (
-          <BaysSection locationId={locationId} locationName={existing.data.name} />
-        )}
+      {/* Bays + danger zone live outside the location form so AddBayForm's
+          own <form> isn't nested (invalid HTML → submit bubbled to PATCH). */}
+      {isEdit && locationId && existing.data && (
+        <BaysSection locationId={locationId} locationName={existing.data.name} />
+      )}
 
-        {/* Edit-only: status + delete */}
-        {isEdit && existing.data && (
+      {isEdit && existing.data && (
           <Card className="border-line">
             <CardHeader>
               <CardTitle className="text-lg">{t('tenantAdmin.locations.dangerZone')}</CardTitle>
@@ -451,7 +452,6 @@ export function LocationFormPage({ mode }: { mode: 'create' | 'edit' }) {
             </CardContent>
           </Card>
         )}
-      </form>
     </div>
   );
 }

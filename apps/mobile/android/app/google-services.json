@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "392805633535",
+    "project_id": "tahawash-6d614",
+    "storage_bucket": "tahawash-6d614.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:392805633535:android:e2adf0876da2e0e23eebca",
+        "android_client_info": {
+          "package_name": "az.tahawash.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWtSO7oAcwGOtELAR_mKSaGrbSdJi3Ofc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

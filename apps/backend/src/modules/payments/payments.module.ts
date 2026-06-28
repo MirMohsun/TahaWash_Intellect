@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env.schema';
+import { HardwareModule } from '../hardware/hardware.module';
 import { CredentialCipherService } from './crypto/credential-cipher.service';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
@@ -18,6 +19,7 @@ import { PAYMENT_PROVIDER_TOKEN, type PaymentProvider } from './payment.types';
  * exports PaymentsService + the cipher for the webhook controller (next increment).
  */
 @Module({
+  imports: [HardwareModule],
   controllers: [PaymentsController, TenantPaymentCredentialsController, EpointWebhookController],
   providers: [
     PaymentsService,

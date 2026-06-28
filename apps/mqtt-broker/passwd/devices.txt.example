@@ -9,7 +9,17 @@
 #   4. Добавить healthcheck: mosquitto_passwd /mosquitto/config/passwd/devices.txt healthcheck
 #   5. Перезапустить: docker compose restart mosquitto
 #
-# Или одной командой (автоматически, без интерактива):
+# Windows (PowerShell, из корня репозитория) — volume :ro в compose не даёт exec писать:
+#   docker run --rm -v "${PWD}/apps/mqtt-broker/passwd:/passwd" eclipse-mosquitto:2.0 `
+#     mosquitto_passwd -b -c /passwd/devices.txt tahawash-backend changeme
+#   docker run --rm -v "${PWD}/apps/mqtt-broker/passwd:/passwd" eclipse-mosquitto:2.0 `
+#     mosquitto_passwd -b /passwd/devices.txt tahawash-device changeme
+#   docker run --rm -v "${PWD}/apps/mqtt-broker/passwd:/passwd" eclipse-mosquitto:2.0 `
+#     mosquitto_passwd -b /passwd/devices.txt healthcheck healthcheck
+#   docker run --rm -v "${PWD}/apps/mqtt-broker/passwd:/passwd" eclipse-mosquitto:2.0 `
+#     chmod 644 /passwd/devices.txt
+#
+# Или одной командой в Linux exec (автоматически, без интерактива):
 #   docker compose exec mosquitto mosquitto_passwd -b /mosquitto/config/passwd/devices.txt \
 #     tahawash-backend <BACKEND_MQTT_PASSWORD>
 #

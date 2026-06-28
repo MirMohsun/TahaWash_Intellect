@@ -7,12 +7,14 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "android": { "buildType": "apk" },
       "ios": { "simulator": true },
       "channel": "development",
       "node": "22.13.0",
       "pnpm": "10.31.0",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:3000"
+        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:3000",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYm9iYnljaGF2ZXMiLCJhIjoiY21wcHNrZnF2MDN4MjJzc2VnM2trbWlxayJ9.mPwFjGL1wU9-GBP_i9IuwA"
       }
     },
     "preview": {

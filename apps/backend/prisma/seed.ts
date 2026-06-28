@@ -132,6 +132,13 @@ async function main(): Promise<void> {
   // Bays are keyed by the unique `qrShortId`. Upsert keeps them idempotent
   // and preserves any transactions that reference them.
   const bayIds = ['9KX42P', '7HM91L', '3PR58Q', '4BV22N'];
+  // Bay 1 — dev Pico target; must match HARDWARE_ID in apps/main.py
+  const bayHardwareIds: (string | null)[] = [
+    'tahawash-wash-01',
+    null,
+    null,
+    null,
+  ];
   const bays = await Promise.all(
     bayIds.map((qrShortId, i) =>
       prisma.bay.upsert({
@@ -141,6 +148,7 @@ async function main(): Promise<void> {
           tenantId: yubox.id,
           name: `Bay ${i + 1}`,
           status: i === 3 ? 'disabled' : 'active',
+          hardwareIdentifier: bayHardwareIds[i] ?? null,
         },
         create: {
           locationId: location.id,
@@ -148,6 +156,7 @@ async function main(): Promise<void> {
           name: `Bay ${i + 1}`,
           qrShortId,
           status: i === 3 ? 'disabled' : 'active',
+          hardwareIdentifier: bayHardwareIds[i] ?? null,
         },
       }),
     ),
