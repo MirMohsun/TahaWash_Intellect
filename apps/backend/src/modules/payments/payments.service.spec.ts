@@ -64,11 +64,9 @@ function makeHarness(opts?: {
       },
       transaction,
     },
-    // enqueueBayCredit reads txn + bay via unscoped.
-    unscoped: {
-      transaction,
-      bay: { findUnique: jest.fn().mockResolvedValue({ hardwareIdentifier: activeBay.hardwareIdentifier }) },
-    },
+    // enqueueBayCredit reads txn + bay via raw prisma (NOT prisma.unscoped — Prisma Proxy).
+    transaction,
+    bay: { findUnique: jest.fn().mockResolvedValue({ hardwareIdentifier: activeBay.hardwareIdentifier }) },
   };
 
   const config = {

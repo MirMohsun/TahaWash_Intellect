@@ -34,8 +34,9 @@ function makeHarness(txnOverrides?: Record<string, unknown>) {
       transaction,
       savedCard: { upsert: jest.fn() },
     },
-    // enqueueBayCredit reads via unscoped (no session on a webhook).
-    unscoped: { transaction, bay },
+    // enqueueBayCredit reads via raw prisma (no HTTP session on a webhook).
+    transaction,
+    bay,
   };
   // epoint mode → the service decrypts the tenant key via the cipher stub.
   const config = {

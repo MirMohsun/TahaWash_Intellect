@@ -6,6 +6,7 @@ import type {
   DailyReportEvent,
   HeartbeatEvent,
   MqttStatusEvent,
+  OfflineEvent,
   RawPicoEvent,
   ReportSnapshotEvent,
 } from './dto/mqtt-events.dto';
@@ -53,13 +54,16 @@ export class HardwareListenerService implements OnModuleInit {
       case 'report_snapshot':
         this.handleSnapshot(hardwareId, event);
         break;
+      case 'offline':
+        await this.handleOffline(hardwareId, event);
+        break;
     }
   }
 
   // ── ACK ──────────────────────────────────────────────────────────────────
 
   private async handleAck(event: AckEvent): Promise<void> {
-    const tx = await this.prisma.unscoped.transaction.findUnique({
+    const tx = await this.prisma.transaction.findUnique({
       where: { id: event.txId },
       select: { id: true, status: true },
     });
@@ -73,7 +77,7 @@ export class HardwareListenerService implements OnModuleInit {
     }
 
     if (event.credited) {
-      await this.prisma.unscoped.transaction.update({
+      await this.prisma.transaction.update({
         where: { id: event.txId },
         data: {
           status: 'paid_credited',
@@ -82,7 +86,7 @@ export class HardwareListenerService implements OnModuleInit {
       });
       this.logger.log(`Transaction ${event.txId} → paid_credited`);
     } else {
-      await this.prisma.unscoped.transaction.update({
+      await this.prisma.transaction.update({
         where: { id: event.txId },
         data: {
           status: 'paid_hardware_error',
@@ -101,7 +105,7 @@ export class HardwareListenerService implements OnModuleInit {
     const bay = await this.findBayByHardwareId(hardwareId);
     if (!bay) return;
 
-    await this.prisma.unscoped.hardwareEvent.create({
+    await this.prisma.hardwareEvent.create({
       data: {
         bayId: bay.id,
         tenantId: bay.tenantId,
@@ -120,7 +124,7 @@ export class HardwareListenerService implements OnModuleInit {
     const bay = await this.findBayByHardwareId(hardwareId);
     if (!bay) return;
 
-    await this.prisma.unscoped.bay.update({
+    await this.prisma.bay.update({
       where: { id: bay.id },
       data: {
         lastSeenAt: new Date(),
@@ -128,6 +132,24 @@ export class HardwareListenerService implements OnModuleInit {
       },
     });
     this.logger.debug(`Heartbeat: hardwareId=${hardwareId} uptime=${event.uptime}s`);
+  }
+
+  // ── Offline (LWT) ──────────────────────────────────────────────────────────
+
+  /**
+   * Брокер прислал Last Will — устройство пропало (питание/Wi-Fi). Сбрасываем
+   * lastSeenAt в null, чтобы статус сразу стал offline (не дожидаясь протухания
+   * по 2-минутному порогу). Следующий heartbeat после реконнекта вернёт online.
+   */
+  private async handleOffline(hardwareId: string, _event: OfflineEvent): Promise<void> {
+    const bay = await this.findBayByHardwareId(hardwareId);
+    if (!bay) return;
+
+    await this.prisma.bay.update({
+      where: { id: bay.id },
+      data: { lastSeenAt: null },
+    });
+    this.logger.warn(`Hardware OFFLINE (LWT): hardwareId=${hardwareId}`);
   }
 
   // ── Daily report ─────────────────────────────────────────────────────────
@@ -162,7 +184,7 @@ export class HardwareListenerService implements OnModuleInit {
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   private async findBayByHardwareId(hardwareId: string) {
-    const bay = await this.prisma.unscoped.bay.findUnique({
+    const bay = await this.prisma.bay.findUnique({
       where: { hardwareIdentifier: hardwareId },
       select: { id: true, tenantId: true },
     });
@@ -192,6 +214,6 @@ export class HardwareListenerService implements OnModuleInit {
       rawTs: ev.ts,
     }));
 
-    await this.prisma.unscoped.hardwareEvent.createMany({ data, skipDuplicates: false });
+    await this.prisma.hardwareEvent.createMany({ data, skipDuplicates: false });
   }
 }

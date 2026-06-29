@@ -52,7 +52,7 @@ MQTT_BROKER    = "192.168.0.102"
 MQTT_PORT      = 1883
 MQTT_USER      = "tahawash-device"   # passwd/devices.txt (apps/mqtt-broker/)
 MQTT_PASSWORD  = "changeme"          # dev default; sync with devices.txt + backend .env
-MQTT_KEEPALIVE = 60
+MQTT_KEEPALIVE = 30          # брокер рвёт через 1.5*keepalive = ~45с -> быстрый LWT offline
 
 # Должен СОВПАДАТЬ 1-в-1 с Bay.hardwareIdentifier в админке (YuBox Bay 1 в seed).
 HARDWARE_ID = "tahawash-wash-01"
@@ -111,6 +111,17 @@ COMBO_MAP = {
 
 # --- Прочее ---
 HEARTBEAT_S        = 60       # период heartbeat
+HEARTBEAT_ON_CONNECT = True   # сразу после connect — admin видит online быстрее
+MQTT_PING_S        = 10       # явный MQTT PINGREQ (umqtt не всегда шлёт сам);
+                              # << keepalive(30), чтобы не было ложных обрывов
+REPORT_DEFER_MS    = 3000      # отложить daily_report после boot (стабилизация сокета)
+MQTT_STATUS_QOS    = 0         # heartbeat / ack / daily_report
+                              # ВАЖНО: только 0! umqtt.simple при qos=1 делает
+                              # блокирующий wait_msg() ради PUBACK. Это даёт
+                              # реентерабельное чтение сокета (publish ACK из
+                              # on_message внутри check_msg) -> поток MQTT рвётся
+                              # -> OSError(-1) и flapping. Надёжность отчётов
+                              # обеспечена прикладным report_ack + повтором.
 REPORT_RETRY_S     = 300      # повтор отправки отчёта, если нет ACK
 REPORT_CHUNK       = 50       # событий в одном MQTT-сообщении отчёта
 LOG_FILE           = "events.jsonl"        # лог текущего дня
@@ -136,6 +147,7 @@ LED         = machine.Pin("LED", machine.Pin.OUT, value=0)
 # ============================================================================
 
 mqtt = None
+wlan = None
 start_ticks = time.ticks_ms()
 
 emulating = False             # подавление входа во время эмуляции
@@ -155,12 +167,33 @@ current_day = None            # "YYYY-MM-DD" текущего лога
 awaiting_ack_for = None       # дата отчёта, по которому ждём ACK
 last_report_attempt = 0       # ticks_ms последней попытки отправки
 last_heartbeat = 0
+last_ping = 0
+boot_report_pending = False
+boot_ready_at = 0
 time_synced = False
 
 
 def log(*args):
     if TEST_MODE:
         print(*args)
+
+
+def log_mqtt_state(where, wlan_ref=None):
+    """TEST_MODE: Wi-Fi IP, gateway, RSSI — для диагностики СБОЙ СВЯЗИ."""
+    if not TEST_MODE:
+        return
+    parts = ["MQTT diag @", where]
+    ref = wlan_ref if wlan_ref is not None else wlan
+    if ref and ref.isconnected():
+        cfg = ref.ifconfig()
+        parts.extend(["ip=", cfg[0], "gw=", cfg[2]])
+        try:
+            parts.extend(["rssi=", ref.status("rssi")])
+        except Exception:
+            pass
+    else:
+        parts.append("wifi=DOWN")
+    log(*parts)
 
 
 # ============================================================================
@@ -354,10 +387,13 @@ def simulate_bill(pulses=5):
     log("SIM: имитация купюры,", pulses, "импульсов")
 
 
-# Неблокирующее чтение из Shell Thonny: пока main() работает,
-# набери число + Enter — это имитация купюры на столько импульсов.
-_stdin_poll = select.poll()
-_stdin_poll.register(sys.stdin, select.POLLIN)
+# Неблокирующее чтение из Shell Thonny (может отсутствовать вне REPL).
+_stdin_poll = None
+try:
+    _stdin_poll = select.poll()
+    _stdin_poll.register(sys.stdin, select.POLLIN)
+except Exception:
+    pass
 
 
 def check_test_input():
@@ -366,9 +402,14 @@ def check_test_input():
          o 3 fn3      -> имитация онлайн-оплаты 3 AZN, программа fn3
          u r1 r3      -> имитация: линии r1+r3 активны (функция запущена)
          u            -> имитация: все линии выключены (функция остановлена)"""
-    if not TEST_MODE:
+    if not TEST_MODE or _stdin_poll is None:
         return
-    if _stdin_poll.poll(0):
+    try:
+        if not _stdin_poll.poll(0):
+            return
+    except Exception:
+        return
+    try:
         line = sys.stdin.readline().strip()
         if not line:
             return
@@ -396,6 +437,8 @@ def check_test_input():
             handle_credit(msg)
         else:
             log("SIM: число + Enter = купюра | o <сумма> [программа] = онлайн")
+    except Exception as e:
+        log("SIM: ошибка ввода:", e)
 
 
 # ============================================================================
@@ -494,12 +537,16 @@ def relay_states():
 #  MQTT
 # ============================================================================
 
-def publish_json(topic, obj):
+def publish_json(topic, obj, qos=0):
     try:
-        mqtt.publish(topic, json.dumps(obj))
+        payload = json.dumps(obj)
+        if qos:
+            mqtt.publish(topic, payload, qos=qos)
+        else:
+            mqtt.publish(topic, payload)
         return True
     except Exception as e:
-        log("ОШИБКА publish:", e)
+        log("ОШИБКА publish:", e, "errno=", getattr(e, "errno", None))
         return False
 
 
@@ -527,7 +574,7 @@ def handle_credit(msg):
         publish_json(TOPIC_STATUS, {
             "type": "ack", "device": HARDWARE_ID, "txId": tx_id,
             "credited": True, "duplicate": True, "ts": now_iso(),
-        })
+        }, qos=MQTT_STATUS_QOS)
         return
 
     # Валидация ДО эмиссии: только целое положительное число AZN.
@@ -545,7 +592,7 @@ def handle_credit(msg):
     if not ok:
         ack["error"] = ("amount must be a positive integer AZN"
                         if not valid else "pulse emulation failed")
-    publish_json(TOPIC_STATUS, ack)
+    publish_json(TOPIC_STATUS, ack, qos=MQTT_STATUS_QOS)
 
     if ok:
         remember_tx(tx_id)
@@ -602,11 +649,14 @@ def send_daily_report():
 
     for p in range(parts):
         chunk = events[p * REPORT_CHUNK:(p + 1) * REPORT_CHUNK]
-        publish_json(TOPIC_STATUS, {
+        body = {
             "type": "daily_report", "device": HARDWARE_ID,
             "date": report_date, "part": p + 1, "totalParts": parts,
             "count": total, "events": chunk, "ts": now_iso(),
-        })
+        }
+        payload = json.dumps(body)
+        log("REPORT publish part", p + 1, "bytes=", len(payload))
+        publish_json(TOPIC_STATUS, body, qos=MQTT_STATUS_QOS)
         time.sleep_ms(100)
 
 
@@ -645,7 +695,7 @@ def on_message(topic, payload):
 
 
 def send_heartbeat():
-    publish_json(TOPIC_STATUS, {
+    ok = publish_json(TOPIC_STATUS, {
         "type": "heartbeat", "device": HARDWARE_ID,
         "uptime": time.ticks_diff(time.ticks_ms(), start_ticks) // 1000,
         "relays": relay_states(),
@@ -653,7 +703,9 @@ def send_heartbeat():
         "pendingReport": awaiting_ack_for,
         "activeFunction": usage_name(usage_active) if usage_active else None,
         "ts": now_iso(),
-    })
+    }, qos=MQTT_STATUS_QOS)
+    if ok:
+        log("HEARTBEAT sent")
 
 
 # ============================================================================
@@ -676,7 +728,18 @@ def connect_wifi():
     machine.reset()
 
 
-def connect_mqtt():
+def disconnect_mqtt():
+    global mqtt
+    if mqtt is None:
+        return
+    try:
+        mqtt.disconnect()
+    except Exception as e:
+        log("MQTT disconnect:", e)
+    mqtt = None
+
+
+def connect_mqtt(wlan_ref=None):
     global mqtt
     mqtt = MQTTClient(
         client_id=HARDWARE_ID,
@@ -687,9 +750,19 @@ def connect_mqtt():
         keepalive=MQTT_KEEPALIVE,
     )
     mqtt.set_callback(on_message)
+    # Last Will & Testament: брокер опубликует это сообщение от нашего имени,
+    # если связь оборвётся некорректно (выдернули питание / пропал Wi-Fi).
+    # Backend ловит type=offline и сразу помечает бокс offline.
+    mqtt.set_last_will(
+        TOPIC_STATUS,
+        json.dumps({"type": "offline", "device": HARDWARE_ID}).encode(),
+        retain=False,
+        qos=MQTT_STATUS_QOS,
+    )
     mqtt.connect()
     mqtt.subscribe(TOPIC_CONTROL)
     log("MQTT OK:", MQTT_BROKER, "| подписка:", TOPIC_CONTROL)
+    log_mqtt_state("connect", wlan_ref)
 
 
 # ============================================================================
@@ -697,18 +770,23 @@ def connect_mqtt():
 # ============================================================================
 
 def main():
-    global current_day, last_heartbeat
+    global current_day, last_heartbeat, last_ping
+    global boot_report_pending, boot_ready_at, wlan
 
     wlan = connect_wifi()
     sync_time()
-    connect_mqtt()
+    connect_mqtt(wlan)
     current_day = today_str()
     LED.value(1)
 
-    # Если после ребута остался неподтверждённый отчёт — дошлём его
-    if file_exists(PENDING_FILE):
-        log("Найден неподтверждённый отчёт — повторная отправка")
-        send_daily_report()
+    if HEARTBEAT_ON_CONNECT:
+        send_heartbeat()
+        last_heartbeat = time.ticks_ms()
+
+    boot_report_pending = file_exists(PENDING_FILE)
+    boot_ready_at = time.ticks_ms()
+    if boot_report_pending:
+        log("Найден неподтверждённый отчёт — отправка через", REPORT_DEFER_MS, "мс")
 
     log("=" * 50)
     log("TAHAWASH Pico готов. Устройство:", HARDWARE_ID)
@@ -718,8 +796,21 @@ def main():
 
     while True:
         try:
+            now = time.ticks_ms()
+
             # 1. Входящие MQTT команды (неблокирующе)
             mqtt.check_msg()
+
+            # 1b. Отложенный daily_report после стабилизации сокета
+            if boot_report_pending and time.ticks_diff(now, boot_ready_at) >= REPORT_DEFER_MS:
+                boot_report_pending = False
+                log("Отложенная отправка daily_report")
+                send_daily_report()
+
+            # 1c. Явный MQTT ping (keepalive)
+            if time.ticks_diff(now, last_ping) >= MQTT_PING_S * 1000:
+                mqtt.ping()
+                last_ping = now
 
             # 2. Авто-выключение реле по таймерам
             check_auto_off()
@@ -734,7 +825,6 @@ def main():
             check_test_input()
 
             # 4. Heartbeat раз в HEARTBEAT_S
-            now = time.ticks_ms()
             if time.ticks_diff(now, last_heartbeat) >= HEARTBEAT_S * 1000:
                 last_heartbeat = now
                 send_heartbeat()
@@ -759,16 +849,23 @@ def main():
 
         except OSError as e:
             # Любой обрыв связи: гасим реле, переподключаемся
-            log("СБОЙ СВЯЗИ:", e, "— переподключение...")
+            log("СБОЙ СВЯЗИ:", e, "errno=", getattr(e, "errno", None), "— переподключение...")
+            log_mqtt_state("failure", wlan)
             LED.value(0)
             for name in RELAY_PINS:
                 relay_set(name, False)
             EMU_OUT_PIN.value(0)
+            disconnect_mqtt()
             try:
-                wlan = connect_wifi()
+                if not wlan.isconnected():
+                    wlan = connect_wifi()
                 if not time_synced:
                     sync_time()
-                connect_mqtt()
+                connect_mqtt(wlan)
+                if HEARTBEAT_ON_CONNECT:
+                    send_heartbeat()
+                    last_heartbeat = time.ticks_ms()
+                last_ping = time.ticks_ms()
                 LED.value(1)
             except Exception as e2:
                 log("Переподключение не удалось:", e2, "— ребут через 10с")

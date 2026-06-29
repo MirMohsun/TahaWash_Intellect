@@ -49,6 +49,23 @@ mosquitto_pub -h localhost -p 1883 -u tahawash-backend -P <пароль> \
   -m '{"type":"get_report"}'
 ```
 
+### 3. Pico на LAN (Windows + Docker Desktop)
+
+Pico подключается к **LAN IP хоста** (`ipconfig` → IPv4 Wi‑Fi), не к `localhost`.
+
+```powershell
+# Разрешить входящий TCP 1883 (Admin PowerShell)
+powershell -ExecutionPolicy Bypass -File scripts/open-mqtt-firewall.ps1
+
+# Проверка с LAN IP (с телефона/ноутбука в той же Wi‑Fi)
+mosquitto_sub -h 192.168.0.102 -p 1883 -u tahawash-device -P changeme -t test -v
+
+# Полная проверка цепочки (backend должен быть запущен)
+pnpm verify:hardware
+```
+
+Во время старта Pico: `docker compose logs -f mosquitto` — должны появиться клиенты `tahawash-wash-01` и `tahawash-backend-*`.
+
 ## Добавление нового Pico
 
 1. В базе данных: создать Bay, задать `hardwareIdentifier` = уникальный ID (например `tahawash-wash-02`)
