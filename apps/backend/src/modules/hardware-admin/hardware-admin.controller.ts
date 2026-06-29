@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { HardwareAdminService } from './hardware-admin.service';
 
@@ -21,6 +21,13 @@ class RelayControlDto {
 class HardwareEventsQueryDto {
   @IsString()
   date!: string; // YYYY-MM-DD
+}
+
+class CreditDto {
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  amount!: number; // целое положительное AZN (Pico отвергает дробное)
 }
 
 @ApiTags('tenant · hardware')
@@ -47,6 +54,13 @@ export class HardwareAdminController {
   @ApiOperation({ summary: 'Запросить у Pico снапшот событий текущего дня' })
   async requestSnapshot(@Param('bayId') bayId: string) {
     await this.svc.requestSnapshot(bayId);
+    return { ok: true };
+  }
+
+  @Post('credit')
+  @ApiOperation({ summary: 'Тестовое зачисление: отправить credit на Pico (имитация оплаты)' })
+  async sendCredit(@Param('bayId') bayId: string, @Body() dto: CreditDto) {
+    await this.svc.sendCredit(bayId, dto.amount);
     return { ok: true };
   }
 

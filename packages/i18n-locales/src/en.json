@@ -743,6 +743,10 @@
       "toastActivated": "Bay activated",
       "toastDisabled": "Bay disabled — customers can't scan it",
       "toastQrRegenerated": "QR regenerated — reprint the sticker",
+      "hardwareOnline": "Online",
+      "hardwareOffline": "Offline",
+      "testCreditLabel": "Test credit:",
+      "toastCreditSent": "Sent {{amount}} AZN test credit",
       "status": {
         "active": "Active",
         "disabled": "Disabled"

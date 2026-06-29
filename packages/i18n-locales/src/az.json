@@ -755,6 +755,10 @@
       "toastActivated": "Boks aktivləşdirildi",
       "toastDisabled": "Boks söndürüldü — müştərilər oxuya bilmir",
       "toastQrRegenerated": "QR yenidən yaradıldı — stikeri yenidən çap edin",
+      "hardwareOnline": "Onlayn",
+      "hardwareOffline": "Oflayn",
+      "testCreditLabel": "Test ödəniş:",
+      "toastCreditSent": "{{amount}} AZN test ödənişi göndərildi",
       "status": {
         "active": "Aktiv",
         "disabled": "Söndürülüb"

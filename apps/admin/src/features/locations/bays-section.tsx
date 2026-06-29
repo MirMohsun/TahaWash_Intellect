@@ -16,6 +16,7 @@ import {
 } from '@/hooks/use-bays';
 import { useHardwareStatus } from '@/hooks/use-hardware-status';
 import { downloadBayQrPdf, downloadLocationBulkQrPdf, type TenantBay } from '@/lib/bays-api';
+import { sendHardwareCredit } from '@/lib/hardware-api';
 
 /**
  * Bays section embedded in the location edit form (Phase 3.7 / B3.3 + B4.1).
@@ -119,7 +120,7 @@ export function BaysSection({
 
 function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
   const { t } = useTranslation();
-  const hardwareStatus = useHardwareStatus(bay.id);
+  const hardwareStatus = useHardwareStatus(bay.id, Boolean(bay.hardwareIdentifier));
   const updateMut = useUpdateBay(locationId);
   const toggleMut = useToggleBayStatus(locationId);
   const regenMut = useRegenerateBayQr(locationId);
@@ -129,6 +130,7 @@ function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
   const [hardware, setHardware] = useState(bay.hardwareIdentifier ?? '');
   const [downloading, setDownloading] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
+  const [crediting, setCrediting] = useState<number | null>(null);
 
   const busy = updateMut.isPending || toggleMut.isPending || regenMut.isPending || downloading;
 
@@ -203,6 +205,18 @@ function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
       toast.error(extractBayErr(err, t));
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const onCredit = async (amount: number) => {
+    setCrediting(amount);
+    try {
+      await sendHardwareCredit(bay.id, amount);
+      toast.success(t('tenantAdmin.bays.toastCreditSent', { amount }));
+    } catch (err) {
+      toast.error(extractBayErr(err, t));
+    } finally {
+      setCrediting(null);
     }
   };
 
@@ -332,6 +346,25 @@ function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
           </Button>
         )}
       </div>
+
+      {/* Тестовое зачисление (имитация оплаты) — только при заданном hardware ID */}
+      {bay.hardwareIdentifier && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-xs text-ink-500">{t('tenantAdmin.bays.testCreditLabel')}</span>
+          {[1, 5].map((amt) => (
+            <Button
+              key={amt}
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void onCredit(amt)}
+              disabled={busy || crediting !== null}
+            >
+              {crediting === amt ? '…' : `+${amt} AZN`}
+            </Button>
+          ))}
+        </div>
+      )}
     </li>
   );
 }

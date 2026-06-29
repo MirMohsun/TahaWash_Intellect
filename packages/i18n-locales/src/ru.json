@@ -767,6 +767,10 @@
       "toastActivated": "Бокс активирован",
       "toastDisabled": "Бокс отключён — клиенты не могут его отсканировать",
       "toastQrRegenerated": "QR перегенерирован — перепечатайте наклейку",
+      "hardwareOnline": "Онлайн",
+      "hardwareOffline": "Офлайн",
+      "testCreditLabel": "Тест оплаты:",
+      "toastCreditSent": "Отправлено зачисление {{amount}} AZN",
       "status": {
         "active": "Активный",
         "disabled": "Отключён"

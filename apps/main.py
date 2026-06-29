@@ -86,7 +86,7 @@ PROGRAM_NAMES = {
     "fn3": "Lopuk",
     "fn4": "Rengli kopuk",
     "fn5": "MUM",
-    "pause": "Пауза",
+    "pause": "Pause",
     "fn6": "Osmos",   # если окажется отдельной линией FN-6
 }
 
@@ -123,7 +123,12 @@ MQTT_STATUS_QOS    = 0         # heartbeat / ack / daily_report
                               # -> OSError(-1) и flapping. Надёжность отчётов
                               # обеспечена прикладным report_ack + повтором.
 REPORT_RETRY_S     = 300      # повтор отправки отчёта, если нет ACK
-REPORT_CHUNK       = 50       # событий в одном MQTT-сообщении отчёта
+REPORT_CHUNK       = 10       # событий в одном MQTT-сообщении отчёта; держим
+                              # сообщение ~1.3 КБ — большие (>~4 КБ) рвут сокет
+                              # на Pico W (OSError -1) и усекают payload
+REPORT_PART_GAP_MS = 600      # пауза между частями отчёта; части шлём ПО ОДНОЙ
+                              # из главного цикла (не пачкой), чтобы сетевой стек
+                              # успевал прокачать TCP — иначе burst рвёт сокет
 LOG_FILE           = "events.jsonl"        # лог текущего дня
 PENDING_FILE       = "events_pending.jsonl"  # отправленный, но не подтверждённый
 
@@ -170,12 +175,20 @@ last_heartbeat = 0
 last_ping = 0
 boot_report_pending = False
 boot_ready_at = 0
+report_queue = []             # части отчёта в очереди (шлём по одной за цикл)
+report_queue_last_ms = 0      # ticks_ms последней отправленной части
 time_synced = False
 
 
 def log(*args):
     if TEST_MODE:
         print(*args)
+
+
+def logi(*args):
+    """Info-уровень: печатает ВСЕГДА (даже при TEST_MODE=False). Для ключевых
+    событий: приём команды, эмиссия сигнала, ack, отправка частей отчёта."""
+    print(*args)
 
 
 def log_mqtt_state(where, wlan_ref=None):
@@ -320,11 +333,14 @@ def emulate_credit(azn):
     if azn <= 0:
         return False
     emulating = True
+    logi("EMIT start: %d AZN -> %d пачек на GPIO15" % (azn, azn))
     try:
         for i in range(azn):
             _emit_one_azn()
+            logi("  пачка %d/%d отправлена" % (i + 1, azn))
             if i < azn - 1:
                 time.sleep_ms(INTER_AZN_GAP_MS)
+        logi("EMIT done: %d пачек отправлено" % azn)
         return True
     except Exception as e:
         log("ОШИБКА эмуляции:", e)
@@ -539,7 +555,12 @@ def relay_states():
 
 def publish_json(topic, obj, qos=0):
     try:
-        payload = json.dumps(obj)
+        # ВАЖНО: .encode() -> bytes. umqtt.simple считает длину MQTT-пакета как
+        # len(payload); для str это ЧИСЛО СИМВОЛОВ, а в сокет пишутся UTF-8
+        # БАЙТЫ. При кириллице (напр. programName "Пауза") байт больше символов
+        # -> длина в заголовке занижена -> брокер ловит "malformed packet" и
+        # рвёт соединение. С bytes len() == числу байт, рассинхрона нет.
+        payload = json.dumps(obj).encode()
         if qos:
             mqtt.publish(topic, payload, qos=qos)
         else:
@@ -592,7 +613,9 @@ def handle_credit(msg):
     if not ok:
         ack["error"] = ("amount must be a positive integer AZN"
                         if not valid else "pulse emulation failed")
-    publish_json(TOPIC_STATUS, ack, qos=MQTT_STATUS_QOS)
+    sent = publish_json(TOPIC_STATUS, ack, qos=MQTT_STATUS_QOS)
+    logi("ACK %s: txId=%s credited=%s" % (
+        "отправлен" if sent else "НЕ отправлен", tx_id, ok))
 
     if ok:
         remember_tx(tx_id)
@@ -624,7 +647,7 @@ def send_snapshot():
 def send_daily_report():
     """Отправка полного лога за день (чанками). Файл НЕ удаляется —
     переименовывается в pending и удаляется только после report_ack."""
-    global awaiting_ack_for, last_report_attempt
+    global awaiting_ack_for, last_report_attempt, report_queue, report_queue_last_ms
     last_report_attempt = time.ticks_ms()
 
     # Переносим лог в pending (если pending уже есть — дописываем в него)
@@ -645,19 +668,42 @@ def send_daily_report():
     parts = (total + REPORT_CHUNK - 1) // REPORT_CHUNK
     if parts == 0:
         parts = 1
-    log("REPORT: дата=%s событий=%d частей=%d" % (report_date, total, parts))
+    logi("REPORT: дата=%s событий=%d частей=%d (в очередь)" % (report_date, total, parts))
 
+    # Кладём части в очередь — отправляются ПО ОДНОЙ из главного цикла
+    # (pump_report_queue), чтобы между ними работал сетевой стек. Пачкой
+    # подряд Pico W не успевает прокачать TCP -> OSError -1 и потеря части.
+    report_queue = []
     for p in range(parts):
         chunk = events[p * REPORT_CHUNK:(p + 1) * REPORT_CHUNK]
-        body = {
+        report_queue.append({
             "type": "daily_report", "device": HARDWARE_ID,
             "date": report_date, "part": p + 1, "totalParts": parts,
             "count": total, "events": chunk, "ts": now_iso(),
-        }
-        payload = json.dumps(body)
-        log("REPORT publish part", p + 1, "bytes=", len(payload))
-        publish_json(TOPIC_STATUS, body, qos=MQTT_STATUS_QOS)
-        time.sleep_ms(100)
+        })
+    report_queue_last_ms = 0   # 0 => первая часть уйдёт немедленно
+
+
+def pump_report_queue():
+    """Отправляет ОДНУ часть отчёта за вызов, с интервалом REPORT_PART_GAP_MS.
+    Между частями главный цикл успевает прокачать сокет (check_msg/ping),
+    поэтому TCP не переполняется и части не теряются (в отличие от пачки)."""
+    global report_queue, report_queue_last_ms
+    if not report_queue:
+        return
+    now = time.ticks_ms()
+    if report_queue_last_ms and \
+       time.ticks_diff(now, report_queue_last_ms) < REPORT_PART_GAP_MS:
+        return
+    body = report_queue[0]
+    payload = json.dumps(body)
+    sent = publish_json(TOPIC_STATUS, body, qos=MQTT_STATUS_QOS)
+    logi("REPORT part %d/%d: %d событий, %d байт -> %s" % (
+        body["part"], body["totalParts"], len(body["events"]), len(payload),
+        "отправлено" if sent else "ОШИБКА"))
+    report_queue_last_ms = now
+    if sent:
+        report_queue.pop(0)   # не отправилось -> оставляем, повтор через GAP
 
 
 def yesterday_str():
@@ -681,7 +727,7 @@ def on_message(topic, payload):
         log("MQTT: не-JSON сообщение, игнор:", payload)
         return
     mtype = msg.get("type")
-    log("MQTT <-", mtype)
+    logi("MQTT <- CMD:", msg)
     if mtype == "credit":
         handle_credit(msg)
     elif mtype == "relay":
@@ -811,6 +857,10 @@ def main():
             if time.ticks_diff(now, last_ping) >= MQTT_PING_S * 1000:
                 mqtt.ping()
                 last_ping = now
+
+            # 1d. Отправка частей отчёта ПО ОДНОЙ за итерацию (не пачкой —
+            #     иначе burst переполняет TCP-буфер Pico W и рвёт сокет).
+            pump_report_queue()
 
             # 2. Авто-выключение реле по таймерам
             check_auto_off()

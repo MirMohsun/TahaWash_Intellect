@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { HardwareService } from '../hardware/hardware.service';
@@ -55,6 +56,29 @@ export class HardwareAdminService {
       pin,
       action,
       duration,
+    });
+  }
+
+  /**
+   * Тестовое зачисление с сайта: публикует credit-команду на Pico с
+   * одноразовым txId (без привязки к Transaction). Pico эмулирует импульсы
+   * и шлёт ack; backend.handleAck для неизвестного txId просто игнорирует —
+   * никаких побочных эффектов в БД. amount — целое положительное AZN.
+   */
+  async sendCredit(bayId: string, amount: number): Promise<void> {
+    const bay = await this.prisma.scoped.bay.findUnique({
+      where: { id: bayId },
+      select: { hardwareIdentifier: true },
+    });
+    if (!bay) throw new NotFoundException({ code: 'BAY_NOT_FOUND' });
+    if (!bay.hardwareIdentifier) {
+      throw new NotFoundException({ code: 'BAY_NO_HARDWARE_ID' });
+    }
+
+    await this.hardware.publish(bay.hardwareIdentifier, {
+      type: 'credit',
+      txId: `admin-test-${randomUUID()}`,
+      amount,
     });
   }
 

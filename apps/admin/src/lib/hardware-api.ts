@@ -17,6 +17,11 @@ export async function requestHardwareSnapshot(bayId: string): Promise<void> {
   await api.post(`/tenant/bays/${bayId}/hardware/snapshot`);
 }
 
+/** Тестовое зачисление: имитация оплаты на amount AZN (целое положительное). */
+export async function sendHardwareCredit(bayId: string, amount: number): Promise<void> {
+  await api.post(`/tenant/bays/${bayId}/hardware/credit`, { amount });
+}
+
 export async function getHardwareEvents(
   bayId: string,
   date: string,
