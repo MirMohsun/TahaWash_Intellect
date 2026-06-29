@@ -51,12 +51,23 @@ export interface ReportSnapshotEvent {
   ts: string;
 }
 
+/**
+ * Last Will & Testament: брокер публикует это сообщение от имени Pico,
+ * когда теряет с ним связь (выдернули питание / пропал Wi-Fi) — устройство
+ * само его не отправляет. Регистрируется в прошивке через set_last_will.
+ */
+export interface OfflineEvent {
+  type: 'offline';
+  device: string;
+}
+
 export type MqttStatusEvent =
   | AckEvent
   | CashEvent
   | HeartbeatEvent
   | DailyReportEvent
-  | ReportSnapshotEvent;
+  | ReportSnapshotEvent
+  | OfflineEvent;
 
 // Сырое событие внутри daily_report
 export interface RawPicoEvent {

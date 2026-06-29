@@ -30,11 +30,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   /**
-   * Прямой доступ без tenant-скоупинга.
-   * Использовать ТОЛЬКО в:
-   *   - MQTT-обработчиках (hardware listener) — нет HTTP-контекста
-   *   - Scheduled jobs (cron) — нет актора
-   *   - Super-admin запросах (уже оборачиваются в withBypass)
+   * Прямой доступ без tenant-скоупinга — используйте `this.prisma` напрямую.
+   * НЕ вызывайте `this.prisma.unscoped`: Prisma Client Proxy перехватывает
+   * свойство `unscoped` и делегаты моделей становятся undefined.
    */
   get unscoped(): PrismaClient {
     return this as unknown as PrismaClient;

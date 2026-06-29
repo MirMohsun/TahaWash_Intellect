@@ -433,7 +433,7 @@ export class PaymentsService {
    */
   private async enqueueBayCredit(transactionId: string): Promise<void> {
     await RequestContext.withBypass(async () => {
-      const txn = await this.prisma.unscoped.transaction.findUnique({
+      const txn = await this.prisma.transaction.findUnique({
         where: { id: transactionId },
         select: { id: true, amountAzn: true, bayId: true },
       });
@@ -442,7 +442,7 @@ export class PaymentsService {
         return;
       }
 
-      const bay = await this.prisma.unscoped.bay.findUnique({
+      const bay = await this.prisma.bay.findUnique({
         where: { id: txn.bayId },
         select: { hardwareIdentifier: true },
       });
@@ -481,7 +481,7 @@ export class PaymentsService {
 
   /** Перевести транзакцию в paid_hardware_error с указанной причиной. */
   private async failCrediting(transactionId: string, reason: string): Promise<void> {
-    await this.prisma.unscoped.transaction.update({
+    await this.prisma.transaction.update({
       where: { id: transactionId },
       data: { status: 'paid_hardware_error', errorReason: reason },
     });

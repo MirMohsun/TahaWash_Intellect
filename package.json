@@ -21,6 +21,7 @@
     "clean": "turbo clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "verify:hardware": "node scripts/verify-hardware-bridge.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

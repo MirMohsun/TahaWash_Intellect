@@ -29,7 +29,7 @@ export class HardwareAckTimeoutService {
     const cutoff = new Date(Date.now() - timeoutS * 1000);
 
     await RequestContext.withBypass(async () => {
-      const stale = await this.prisma.unscoped.transaction.findMany({
+      const stale = await this.prisma.transaction.findMany({
         where: {
           status: 'paid_crediting',
           updatedAt: { lt: cutoff },
@@ -42,7 +42,7 @@ export class HardwareAckTimeoutService {
       this.logger.warn(`Hardware ACK timeout: ${stale.length} transaction(s) exceeding ${timeoutS}s`);
 
       for (const tx of stale) {
-        await this.prisma.unscoped.transaction.update({
+        await this.prisma.transaction.update({
           where: { id: tx.id },
           data: {
             status: 'paid_hardware_error',
