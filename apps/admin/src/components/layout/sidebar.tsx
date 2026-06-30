@@ -4,6 +4,7 @@ import {
   CalendarClock,
   Coins,
   CreditCard,
+  FileBarChart,
   LayoutDashboard,
   MapPin,
   Palette,
@@ -49,6 +50,12 @@ const NAV: NavItem[] = [
     match: '/financials',
     labelKey: 'tenantAdmin.nav.financials',
     icon: Coins,
+  },
+  {
+    to: '/reports',
+    match: '/reports',
+    labelKey: 'tenantAdmin.nav.reports',
+    icon: FileBarChart,
   },
   {
     to: '/branding',

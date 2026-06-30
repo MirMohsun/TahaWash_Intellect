@@ -633,15 +633,27 @@ def handle_relay(msg):
               msg.get("duration", 0))
 
 
-def send_snapshot():
-    """Текущий срез дня по запросу бэкэнда."""
+def send_snapshot(request_id=None):
+    """Текущий срез дня по запросу бэкэнда (get_report). Шлём ВСЕ события дня
+    чанками через очередь (как daily_report) — по одной части за цикл, чтобы не
+    рвать сокет. requestId возвращаем в каждой части, чтобы backend сопоставил
+    ответ со своим синхронным запросом."""
     events = read_events(LOG_FILE)
-    publish_json(TOPIC_STATUS, {
-        "type": "report_snapshot", "device": HARDWARE_ID,
-        "date": today_str(), "count": len(events),
-        "events": events[-REPORT_CHUNK:],   # последние N, чтобы влезть в сообщение
-        "ts": now_iso(),
-    })
+    total = len(events)
+    parts = (total + REPORT_CHUNK - 1) // REPORT_CHUNK
+    if parts == 0:
+        parts = 1
+    date = today_str()
+    logi("SNAPSHOT: дата=%s событий=%d частей=%d reqId=%s (в очередь)" % (
+        date, total, parts, request_id))
+    for p in range(parts):
+        chunk = events[p * REPORT_CHUNK:(p + 1) * REPORT_CHUNK]
+        report_queue.append({
+            "type": "report_snapshot", "device": HARDWARE_ID,
+            "date": date, "requestId": request_id,
+            "part": p + 1, "totalParts": parts,
+            "count": total, "events": chunk, "ts": now_iso(),
+        })
 
 
 def send_daily_report():
@@ -733,7 +745,7 @@ def on_message(topic, payload):
     elif mtype == "relay":
         handle_relay(msg)
     elif mtype == "get_report":
-        send_snapshot()
+        send_snapshot(msg.get("requestId"))
     elif mtype == "report_ack":
         handle_report_ack(msg)
     else:

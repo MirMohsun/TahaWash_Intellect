@@ -49,6 +49,10 @@ export interface ReportSnapshotEvent {
   count: number;
   events: RawPicoEvent[];
   ts: string;
+  // Синхронный снимок «по кнопке»: сопоставление ответа с запросом + чанкинг.
+  requestId?: string;
+  part?: number;
+  totalParts?: number;
 }
 
 /**
@@ -106,6 +110,7 @@ export type RelayCommand = {
 
 export type GetReportCommand = {
   type: 'get_report';
+  requestId?: string; // для синхронного снимка: Pico вернёт его в report_snapshot
 };
 
 export type ReportAckCommand = {

@@ -372,6 +372,7 @@
       "locations": "Locations",
       "transactions": "Transactions",
       "financials": "Financials",
+      "reports": "Reports",
       "branding": "Branding",
       "businessProfile": "Business profile",
       "subscription": "Subscription",
@@ -564,6 +565,45 @@
       "byLocationEmpty": "No paid washes in this range yet.",
       "byBay": "Top bays by revenue",
       "byBayEmpty": "No paid washes in this range yet."
+    },
+    "reports": {
+      "title": "Reports",
+      "subtitle": "Per-bay events: report over a date range and a current snapshot (queried from the Pico).",
+      "from": "From",
+      "to": "To",
+      "loadError": "Couldn't load the report. Check your connection and retry.",
+      "empty": "No data for this date.",
+      "noEvents": "No events.",
+      "eventCount_one": "{{count}} event",
+      "eventCount_other": "{{count}} events",
+      "byBay": "By bay",
+      "byProgram": "By program",
+      "events": "Events",
+      "backToAll": "All bays",
+      "requestSnapshot": "Current snapshot",
+      "snapshotLoading": "Requesting…",
+      "snapshotReady": "Current snapshot received",
+      "snapshotError": "Couldn't get the snapshot. The Pico may be offline.",
+      "currentSnapshot": "Current snapshot",
+      "kpi": {
+        "revenue": "Revenue",
+        "cash": "Cash",
+        "online": "Online",
+        "events": "Events"
+      },
+      "eventType": {
+        "cash": "Cash",
+        "online": "Online",
+        "usage": "Usage",
+        "anomaly": "Anomaly"
+      },
+      "col": {
+        "date": "Date",
+        "time": "Time",
+        "type": "Type",
+        "program": "Program",
+        "amount": "Amount"
+      }
     },
     "transactions": {
       "title": "Transactions",

@@ -22,6 +22,7 @@ import { SmsModule } from './modules/sms/sms.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { TenantDashboardModule } from './modules/tenant-dashboard/tenant-dashboard.module';
 import { TenantFinancialsModule } from './modules/tenant-financials/tenant-financials.module';
+import { TenantReportsModule } from './modules/tenant-reports/tenant-reports.module';
 import { TenantNotificationsModule } from './modules/tenant-notifications/tenant-notifications.module';
 import { TenantSubscriptionsModule } from './modules/tenant-subscriptions/tenant-subscriptions.module';
 import { TenantTransactionsModule } from './modules/tenant-transactions/tenant-transactions.module';
@@ -53,6 +54,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     TenantDashboardModule,
     TenantTransactionsModule,
     TenantFinancialsModule,
+    TenantReportsModule,
     TenantSubscriptionsModule,
     TenantNotificationsModule,
     LocationsModule,

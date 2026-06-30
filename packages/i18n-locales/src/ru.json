@@ -384,6 +384,7 @@
       "locations": "Филиалы",
       "transactions": "Транзакции",
       "financials": "Финансы",
+      "reports": "Отчёты",
       "branding": "Бренд",
       "businessProfile": "Профиль бизнеса",
       "subscription": "Подписка",
@@ -578,6 +579,47 @@
       "byLocationEmpty": "В этом диапазоне оплаченных моек пока нет.",
       "byBay": "Боксы по выручке",
       "byBayEmpty": "В этом диапазоне оплаченных моек пока нет."
+    },
+    "reports": {
+      "title": "Отчёты",
+      "subtitle": "События по боксам: отчёт за диапазон дат и текущий срез (запрос к Pico).",
+      "from": "Начало",
+      "to": "Конец",
+      "loadError": "Не удалось загрузить отчёт. Проверьте интернет и повторите.",
+      "empty": "Нет данных за эту дату.",
+      "noEvents": "Событий нет.",
+      "eventCount_one": "{{count}} событие",
+      "eventCount_few": "{{count}} события",
+      "eventCount_many": "{{count}} событий",
+      "eventCount_other": "{{count}} событий",
+      "byBay": "По боксам",
+      "byProgram": "По программам",
+      "events": "События",
+      "backToAll": "Ко всем боксам",
+      "requestSnapshot": "Текущий срез",
+      "snapshotLoading": "Запрос…",
+      "snapshotReady": "Текущий срез получен",
+      "snapshotError": "Не удалось получить срез. Возможно, Pico офлайн.",
+      "currentSnapshot": "Текущий срез",
+      "kpi": {
+        "revenue": "Выручка",
+        "cash": "Наличные",
+        "online": "Онлайн",
+        "events": "События"
+      },
+      "eventType": {
+        "cash": "Наличные",
+        "online": "Онлайн",
+        "usage": "Использование",
+        "anomaly": "Аномалия"
+      },
+      "col": {
+        "date": "Дата",
+        "time": "Время",
+        "type": "Тип",
+        "program": "Программа",
+        "amount": "Сумма"
+      }
     },
     "transactions": {
       "title": "Транзакции",

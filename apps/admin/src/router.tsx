@@ -11,6 +11,7 @@ import { BrandingPage } from '@/features/branding/branding-page';
 import { PaymentCredentialsPage } from '@/features/payments/payment-credentials-page';
 import { BusinessProfilePage } from '@/features/business-profile/business-profile-page';
 import { FinancialsPage } from '@/features/financials/financials-page';
+import { ReportsPage } from '@/features/reports/reports-page';
 import { LocationFormPage } from '@/features/locations/location-form-page';
 import { LocationsPage } from '@/features/locations/locations-page';
 import { SubscriptionPage } from '@/features/subscription/subscription-page';
@@ -127,6 +128,12 @@ const financialsRoute = createRoute({
   getParentRoute: () => protectedLayoutRoute,
   path: '/financials',
   component: FinancialsPage,
+});
+
+const reportsRoute = createRoute({
+  getParentRoute: () => protectedLayoutRoute,
+  path: '/reports',
+  component: ReportsPage,
 });
 
 const brandingRoute = createRoute({
@@ -322,6 +329,7 @@ const routeTree = rootRoute.addChildren([
     transactionsRoute,
     transactionDetailRoute,
     financialsRoute,
+    reportsRoute,
     brandingRoute,
     businessProfileRoute,
     subscriptionRoute,

@@ -11,6 +11,7 @@ import type {
   ReportSnapshotEvent,
 } from './dto/mqtt-events.dto';
 import { HardwareService } from './hardware.service';
+import { SnapshotCoordinator } from './snapshot-coordinator.service';
 
 /**
  * Обрабатывает входящие MQTT-события от Pico и обновляет базу данных.
@@ -29,6 +30,7 @@ export class HardwareListenerService implements OnModuleInit {
   constructor(
     private readonly hardware: HardwareService,
     private readonly prisma: PrismaService,
+    private readonly snapshots: SnapshotCoordinator,
   ) {}
 
   onModuleInit() {
@@ -158,6 +160,16 @@ export class HardwareListenerService implements OnModuleInit {
     const bay = await this.findBayByHardwareId(hardwareId);
     if (!bay) return;
 
+    // Идемпотентность: первая часть отчёта стирает все ранее сохранённые
+    // события этого бокса за эту дату, затем части переинсертятся. Это
+    // защищает от дублей при повторной отправке отчёта (ретраи) и от
+    // двойного учёта real-time cash-событий, которые тоже входят в отчёт.
+    if (event.part === 1) {
+      await this.prisma.hardwareEvent.deleteMany({
+        where: { bayId: bay.id, reportDate: event.date },
+      });
+    }
+
     if (event.events.length > 0) {
       await this.saveRawEvents(bay.id, bay.tenantId, event.date, event.events);
     }
@@ -177,8 +189,18 @@ export class HardwareListenerService implements OnModuleInit {
 
   private handleSnapshot(hardwareId: string, event: ReportSnapshotEvent): void {
     this.logger.log(
-      `Snapshot: hardwareId=${hardwareId} date=${event.date} count=${event.count}`,
+      `Snapshot: hardwareId=${hardwareId} date=${event.date} ` +
+        `part=${event.part ?? 1}/${event.totalParts ?? 1} count=${event.count}`,
     );
+    // Синхронный снимок «по кнопке»: отдаём части в координатор по requestId.
+    if (event.requestId) {
+      this.snapshots.ingest(
+        event.requestId,
+        event.part ?? 1,
+        event.totalParts ?? 1,
+        event.events ?? [],
+      );
+    }
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────

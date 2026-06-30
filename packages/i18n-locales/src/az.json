@@ -372,6 +372,7 @@
       "locations": "Filiallar",
       "transactions": "Əməliyyatlar",
       "financials": "Maliyyə",
+      "reports": "Hesabatlar",
       "branding": "Brend",
       "businessProfile": "Biznes profili",
       "subscription": "Abunəlik",
@@ -566,6 +567,47 @@
       "byLocationEmpty": "Bu aralıqda hələ ödənişli yuma yoxdur.",
       "byBay": "Gəlirə görə ən fəal bokslar",
       "byBayEmpty": "Bu aralıqda hələ ödənişli yuma yoxdur."
+    },
+    "reports": {
+      "title": "Hesabatlar",
+      "subtitle": "Boks üzrə hadisələr: tarix aralığı üzrə hesabat və cari kəsim (Pico-dan sorğu).",
+      "from": "Başlanğıc",
+      "to": "Son",
+      "loadError": "Hesabat yüklənmədi. İnternetinizi yoxlayın və yenidən cəhd edin.",
+      "empty": "Bu tarixdə məlumat yoxdur.",
+      "noEvents": "Hadisə yoxdur.",
+      "eventCount_one": "{{count}} hadisə",
+      "eventCount_few": "{{count}} hadisə",
+      "eventCount_many": "{{count}} hadisə",
+      "eventCount_other": "{{count}} hadisə",
+      "byBay": "Bokslar üzrə",
+      "byProgram": "Proqramlar üzrə",
+      "events": "Hadisələr",
+      "backToAll": "Bütün bokslara",
+      "requestSnapshot": "Cari kəsim",
+      "snapshotLoading": "Sorğu göndərilir…",
+      "snapshotReady": "Cari kəsim alındı",
+      "snapshotError": "Cari kəsim alınmadı. Pico oflayn ola bilər.",
+      "currentSnapshot": "Cari kəsim",
+      "kpi": {
+        "revenue": "Gəlir",
+        "cash": "Nağd",
+        "online": "Onlayn",
+        "events": "Hadisələr"
+      },
+      "eventType": {
+        "cash": "Nağd",
+        "online": "Onlayn",
+        "usage": "İstifadə",
+        "anomaly": "Anomaliya"
+      },
+      "col": {
+        "date": "Tarix",
+        "time": "Vaxt",
+        "type": "Tip",
+        "program": "Proqram",
+        "amount": "Məbləğ"
+      }
     },
     "transactions": {
       "title": "Əməliyyatlar",
