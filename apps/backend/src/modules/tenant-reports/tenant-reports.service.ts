@@ -4,7 +4,7 @@ import { HardwareService } from '../hardware/hardware.service';
 import { SnapshotCoordinator } from '../hardware/snapshot-coordinator.service';
 import type { RawPicoEvent } from '../hardware/dto/mqtt-events.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { aggregateTotals, type NormalizedEvent } from './report-aggregation';
+import { aggregateTotals, buildSessions, type NormalizedEvent } from './report-aggregation';
 
 interface EventDto {
   eventType: string;
@@ -47,13 +47,15 @@ export class TenantReportsService {
         orderBy: [{ reportDate: 'asc' }, { rawTs: 'asc' }],
       });
 
+      const eventDtos = events.map(dbToEventDto);
       return {
         from,
         to,
         scope: 'bay' as const,
         bay: { id: bay.id, name: bay.name, locationName: bay.location.name },
         totals: aggregateTotals(events.map(dbToNorm)),
-        events: events.map(dbToEventDto),
+        sessions: buildSessions(eventDtos),
+        events: eventDtos,
       };
     }
 
@@ -119,6 +121,7 @@ export class TenantReportsService {
       capturedAt: new Date().toISOString(),
       bay: { id: bayId, name: bay.name, locationName: bay.location.name },
       totals: aggregateTotals(raw.map(rawToNorm)),
+      sessions: buildSessions(events),
       events,
     };
   }

@@ -43,12 +43,21 @@ export interface TenantDailyReport {
   }>;
 }
 
+export interface ReportSession {
+  startedAt: string;
+  paymentType: 'cash' | 'online' | null;
+  amountAzn: string | null;
+  program: string | null;
+  functions: Array<{ name: string; at: string }>;
+}
+
 export interface BayDailyReport {
   from: string;
   to: string;
   scope: 'bay';
   bay: { id: string; name: string; locationName: string };
   totals: ReportTotals;
+  sessions: ReportSession[];
   events: ReportEvent[];
 }
 
@@ -58,6 +67,7 @@ export interface SnapshotReport {
   capturedAt: string;
   bay: { id: string; name: string; locationName: string };
   totals: ReportTotals;
+  sessions: ReportSession[];
   events: ReportEvent[];
 }
 

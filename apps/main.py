@@ -34,28 +34,23 @@ import select
 import ntptime
 from umqtt.simple import MQTTClient
 
+import config
+cfg = config.get_config()
+WIFI_SSID     = cfg["wifi_ssid"]
+WIFI_PASS     = cfg["wifi_pass"]
+MQTT_BROKER   = cfg["mqtt_broker"]
+MQTT_USER     = cfg["mqtt_user"]
+MQTT_PASSWORD = cfg["mqtt_pass"]
+HARDWARE_ID   = cfg["hardware_id"]
+MQTT_PORT     = cfg["mqtt_port"]
 # ============================================================================
 #  КОНФИГУРАЦИЯ
 # ============================================================================
 
 TEST_MODE = True          # True = подробные принты в Thonny + simulate_bill()
-                          # False = боевой режим (тихий)
 
-WIFI_SSID = "Sol"
-WIFI_PASS = "01081328s189"
-
-# --- MQTT ---
-# Локальная разработка: LAN IP машины с docker compose (ipconfig → Wi-Fi IPv4).
-# НЕ localhost — Pico не видит localhost хоста!
-# Продакшн: публичный адрес Mosquitto.
-MQTT_BROKER    = "192.168.0.102"
-MQTT_PORT      = 1883
-MQTT_USER      = "tahawash-device"   # passwd/devices.txt (apps/mqtt-broker/)
-MQTT_PASSWORD  = "changeme"          # dev default; sync with devices.txt + backend .env
 MQTT_KEEPALIVE = 30          # брокер рвёт через 1.5*keepalive = ~45с -> быстрый LWT offline
 
-# Должен СОВПАДАТЬ 1-в-1 с Bay.hardwareIdentifier в админке (YuBox Bay 1 в seed).
-HARDWARE_ID = "tahawash-wash-01"
 
 TOPIC_CONTROL = ("tahawash/hardware/%s/control" % HARDWARE_ID).encode()
 TOPIC_STATUS  = ("tahawash/hardware/%s/status" % HARDWARE_ID).encode()

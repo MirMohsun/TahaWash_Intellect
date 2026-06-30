@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useBaySnapshot, useDailyReport } from '@/hooks/use-reports';
-import type { ReportEvent, ReportTotals, SnapshotReport } from '@/lib/reports-api';
+import type { ReportEvent, ReportSession, ReportTotals, SnapshotReport } from '@/lib/reports-api';
 import { bakuDateString } from '@/lib/baku-day';
 
 /**
@@ -144,7 +144,12 @@ function BayReport({
   report,
   onBack,
 }: {
-  report: { bay: { name: string; locationName: string; id: string }; totals: ReportTotals; events: ReportEvent[] };
+  report: {
+    bay: { name: string; locationName: string; id: string };
+    totals: ReportTotals;
+    sessions: ReportSession[];
+    events: ReportEvent[];
+  };
   onBack: () => void;
 }) {
   const { t } = useTranslation();
@@ -198,6 +203,7 @@ function BayReport({
           </CardHeader>
           <CardContent className="space-y-4">
             <TotalsStrip totals={live.totals} loading={false} />
+            <SessionsList sessions={live.sessions} />
             <EventsTable events={live.events} />
           </CardContent>
         </Card>
@@ -205,6 +211,7 @@ function BayReport({
 
       {/* Daily (из БД) */}
       <TotalsStrip totals={report.totals} loading={false} />
+      <SessionsCard sessions={report.sessions} />
       <ProgramBreakdown totals={report.totals} />
       <Card>
         <CardHeader>
@@ -276,6 +283,53 @@ function ProgramBreakdown({ totals }: { totals: ReportTotals }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SessionsCard({ sessions }: { sessions: ReportSession[] }) {
+  const { t } = useTranslation();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">{t('tenantAdmin.reports.sessions')}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <SessionsList sessions={sessions} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function SessionsList({ sessions }: { sessions: ReportSession[] }) {
+  const { t } = useTranslation();
+  if (sessions.length === 0) {
+    return <p className="text-sm text-ink-500 italic">{t('tenantAdmin.reports.noSessions')}</p>;
+  }
+  return (
+    <ul className="divide-y divide-line-soft">
+      {sessions.map((s, i) => (
+        <li key={`${s.startedAt}-${i}`} className="py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-xs text-ink-500 tabular-nums whitespace-nowrap">
+            {dateLabel(s.startedAt)} {hhmm(s.startedAt)}
+          </span>
+          {s.paymentType ? (
+            <span className="font-semibold text-ink-900">
+              {t(`tenantAdmin.reports.eventType.${s.paymentType}`)}
+              {s.amountAzn ? ` · ${s.amountAzn} ₼` : ''}
+              {s.program ? ` · ${s.program}` : ''}
+            </span>
+          ) : (
+            <span className="text-ink-500 italic">{t('tenantAdmin.reports.noPayment')}</span>
+          )}
+          {s.functions.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-ink-700">
+              <span className="text-ink-400">→</span>
+              {s.functions.map((f) => f.name).join(', ')}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
