@@ -131,6 +131,7 @@ function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
   const [downloading, setDownloading] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [crediting, setCrediting] = useState<number | null>(null);
+  const [customAmount, setCustomAmount] = useState('');
 
   const busy = updateMut.isPending || toggleMut.isPending || regenMut.isPending || downloading;
 
@@ -218,6 +219,17 @@ function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
     } finally {
       setCrediting(null);
     }
+  };
+
+  const onCustomCredit = () => {
+    const n = Number(customAmount);
+    // Та же валидация, что в прошивке/бэкенде: целое 1..100 AZN.
+    if (!Number.isInteger(n) || n < 1 || n > 100) {
+      toast.error(t('tenantAdmin.bays.creditInvalid'));
+      return;
+    }
+    void onCredit(n);
+    setCustomAmount('');
   };
 
   return (
@@ -363,6 +375,33 @@ function BayRow({ bay, locationId }: { bay: TenantBay; locationId: string }) {
               {crediting === amt ? '…' : `+${amt} AZN`}
             </Button>
           ))}
+          <Input
+            type="number"
+            min={1}
+            max={100}
+            inputMode="numeric"
+            value={customAmount}
+            onChange={(e) => setCustomAmount(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onCustomCredit();
+              }
+            }}
+            placeholder="AZN"
+            disabled={busy || crediting !== null}
+            className="h-8 w-20"
+          />
+          <Button
+            type="button"
+            size="sm"
+            onClick={onCustomCredit}
+            disabled={busy || crediting !== null || customAmount.trim() === ''}
+          >
+            {crediting !== null && crediting === Number(customAmount)
+              ? '…'
+              : t('tenantAdmin.bays.creditSend')}
+          </Button>
         </div>
       )}
     </li>

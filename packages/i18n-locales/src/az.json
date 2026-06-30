@@ -801,6 +801,8 @@
       "hardwareOffline": "Oflayn",
       "testCreditLabel": "Test ödəniş:",
       "toastCreditSent": "{{amount}} AZN test ödənişi göndərildi",
+      "creditSend": "Göndər",
+      "creditInvalid": "1–100 arası tam ədəd daxil edin",
       "status": {
         "active": "Aktiv",
         "disabled": "Söndürülüb"

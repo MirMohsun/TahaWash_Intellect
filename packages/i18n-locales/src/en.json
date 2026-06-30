@@ -787,6 +787,8 @@
       "hardwareOffline": "Offline",
       "testCreditLabel": "Test credit:",
       "toastCreditSent": "Sent {{amount}} AZN test credit",
+      "creditSend": "Send",
+      "creditInvalid": "Enter a whole number 1–100",
       "status": {
         "active": "Active",
         "disabled": "Disabled"

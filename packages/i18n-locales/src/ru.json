@@ -813,6 +813,8 @@
       "hardwareOffline": "Офлайн",
       "testCreditLabel": "Тест оплаты:",
       "toastCreditSent": "Отправлено зачисление {{amount}} AZN",
+      "creditSend": "Начислить",
+      "creditInvalid": "Введите целое число 1–100",
       "status": {
         "active": "Активный",
         "disabled": "Отключён"

@@ -157,6 +157,7 @@ start_ticks = time.ticks_ms()
 
 emulating = False             # подавление входа во время эмуляции
 emu_guard_until = 0           # ticks_ms, до которого вход ещё подавлен
+credit_job = None             # неблокирующая эмиссия: {tx_id, azn, amount, program, done, last_ms}
 
 # Дедупликация онлайн-кредитов: последние обработанные txId (ограниченный размер)
 processed_tx = []             # список txId в порядке обработки
@@ -324,32 +325,60 @@ def _emit_one_azn():
     EMU_OUT_PIN.value(0)
 
 
-def emulate_credit(azn):
-    """Зачислить целое число AZN: послать `azn` пачек на плату Tahwash через
-    GPIO 15 (BC547). Между пачками пауза INTER_AZN_GAP_MS.
-    На время эмуляции + защитный интервал вход GPIO 7 подавлен, чтобы Pico
-    не посчитал собственные импульсы как наличные."""
-    global emulating, emu_guard_until, bill_pulse_count
-    if azn <= 0:
-        return False
-    emulating = True
-    logi("EMIT start: %d AZN -> %d пачек на GPIO15" % (azn, azn))
+def pump_credit():
+    """Неблокирующая эмиссия онлайн-кредита: выдаёт ОДНУ пачку (1 AZN) за вызов,
+    с паузой INTER_AZN_GAP_MS между пачками. Сама пачка (_emit_one_azn) занимает
+    ~200мс — короткий блок ради точной формы импульса. Большие суммы больше НЕ
+    монополизируют главный цикл, поэтому ping/heartbeat продолжают идти и связь
+    не рвётся по keepalive. Задачу ставит handle_credit, вызывается из main()."""
+    global credit_job
+    if credit_job is None:
+        return
+    now = time.ticks_ms()
+    if credit_job["done"] > 0 and \
+       time.ticks_diff(now, credit_job["last_ms"]) < INTER_AZN_GAP_MS:
+        return
     try:
-        for i in range(azn):
-            _emit_one_azn()
-            logi("  пачка %d/%d отправлена" % (i + 1, azn))
-            if i < azn - 1:
-                time.sleep_ms(INTER_AZN_GAP_MS)
-        logi("EMIT done: %d пачек отправлено" % azn)
-        return True
+        _emit_one_azn()
     except Exception as e:
-        log("ОШИБКА эмуляции:", e)
+        log("ОШИБКА эмиссии:", e)
         EMU_OUT_PIN.value(0)
-        return False
-    finally:
-        emu_guard_until = time.ticks_add(time.ticks_ms(), EMU_GUARD_MS)
-        bill_pulse_count = 0        # сброс всего, что могло насчитаться
-        emulating = False
+        _finish_credit(False)
+        return
+    credit_job["done"] += 1
+    credit_job["last_ms"] = now
+    logi("  пачка %d/%d отправлена" % (credit_job["done"], credit_job["azn"]))
+    if credit_job["done"] >= credit_job["azn"]:
+        _finish_credit(True)
+
+
+def _finish_credit(ok):
+    """Завершение эмиссии: снять подавление входа, отправить ack, записать
+    событие online и запомнить txId (дедуп)."""
+    global credit_job, emulating, emu_guard_until, bill_pulse_count
+    job = credit_job
+    credit_job = None
+    emu_guard_until = time.ticks_add(time.ticks_ms(), EMU_GUARD_MS)
+    bill_pulse_count = 0          # сброс всего, что могло насчитаться
+    emulating = False
+    if job is None:
+        return
+    tx_id = job["tx_id"]
+    ack = {"type": "ack", "device": HARDWARE_ID, "txId": tx_id,
+           "credited": ok, "ts": now_iso()}
+    if not ok:
+        ack["error"] = "pulse emulation failed"
+    sent = publish_json(TOPIC_STATUS, ack, qos=MQTT_STATUS_QOS)
+    logi("EMIT done: txId=%s azn=%d | ACK %s credited=%s" % (
+        tx_id, job["azn"], "отправлен" if sent else "НЕ отправлен", ok))
+    if ok:
+        remember_tx(tx_id)
+        ev = {"type": "online", "amount": job["amount"], "txId": tx_id,
+              "azn": job["azn"], "pulses": job["azn"] * 2}
+        if job["program"]:
+            ev["program"] = job["program"]
+            ev["programName"] = PROGRAM_NAMES.get(job["program"], job["program"])
+        log_event(ev)
 
 
 # ============================================================================
@@ -584,6 +613,7 @@ def handle_credit(msg):
     """Онлайн-оплата: {"type":"credit","txId":"...","amount":3,"programPin":"fn3"?}
     Сумма принимается ТОЛЬКО целым числом AZN (1 пачка = 1 AZN). Дробные суммы
     отклоняются, чтобы не было тихого недозачисления."""
+    global credit_job, emulating
     tx_id = msg.get("txId")
     amount = msg.get("amount", 0)
     program = msg.get("programPin")
@@ -598,33 +628,34 @@ def handle_credit(msg):
         }, qos=MQTT_STATUS_QOS)
         return
 
-    # Валидация ДО эмиссии: только целое положительное число AZN.
+    # Валидация: только целое положительное число AZN.
     valid = isinstance(amount, (int, float)) and amount > 0 \
         and float(amount) == int(amount)
-    azn = int(amount) if valid else 0
-    log("CREDIT: txId=%s amount=%s -> %s" % (
-        tx_id, amount,
-        ("%d пачек" % azn) if valid else "ОТКЛОНЕНО (сумма не целое AZN)"))
+    if not valid:
+        log("CREDIT: txId=%s amount=%s ОТКЛОНЕНО (сумма не целое AZN)" % (tx_id, amount))
+        publish_json(TOPIC_STATUS, {
+            "type": "ack", "device": HARDWARE_ID, "txId": tx_id,
+            "credited": False, "error": "amount must be a positive integer AZN",
+            "ts": now_iso(),
+        }, qos=MQTT_STATUS_QOS)
+        return
 
-    ok = valid and emulate_credit(azn)
+    # Одна эмиссия за раз: если уже идёт — отклоняем (ack busy).
+    if credit_job is not None:
+        log("CREDIT: txId=%s — эмиссия уже идёт, отклонено" % tx_id)
+        publish_json(TOPIC_STATUS, {
+            "type": "ack", "device": HARDWARE_ID, "txId": tx_id,
+            "credited": False, "error": "busy", "ts": now_iso(),
+        }, qos=MQTT_STATUS_QOS)
+        return
 
-    ack = {"type": "ack", "device": HARDWARE_ID, "txId": tx_id,
-           "credited": ok, "ts": now_iso()}
-    if not ok:
-        ack["error"] = ("amount must be a positive integer AZN"
-                        if not valid else "pulse emulation failed")
-    sent = publish_json(TOPIC_STATUS, ack, qos=MQTT_STATUS_QOS)
-    logi("ACK %s: txId=%s credited=%s" % (
-        "отправлен" if sent else "НЕ отправлен", tx_id, ok))
-
-    if ok:
-        remember_tx(tx_id)
-        ev = {"type": "online", "amount": amount, "txId": tx_id,
-              "azn": azn, "pulses": azn * 2}
-        if program:
-            ev["program"] = program
-            ev["programName"] = PROGRAM_NAMES.get(program, program)
-        log_event(ev)
+    # Ставим НЕБЛОКИРУЮЩУЮ задачу — пачки выдаст pump_credit() из главного цикла,
+    # ack уйдёт по завершении (_finish_credit). Так большая сумма не рвёт связь.
+    azn = int(amount)
+    emulating = True              # подавляем вход на время эмиссии
+    credit_job = {"tx_id": tx_id, "azn": azn, "amount": amount,
+                  "program": program, "done": 0, "last_ms": 0}
+    logi("CREDIT job: txId=%s azn=%d -> неблокирующая эмиссия" % (tx_id, azn))
 
 
 def handle_relay(msg):
@@ -873,6 +904,10 @@ def main():
             # 1d. Отправка частей отчёта ПО ОДНОЙ за итерацию (не пачкой —
             #     иначе burst переполняет TCP-буфер Pico W и рвёт сокет).
             pump_report_queue()
+
+            # 1e. Неблокирующая эмиссия кредита: одна пачка за итерацию,
+            #     чтобы большая сумма не прерывала ping/heartbeat.
+            pump_credit()
 
             # 2. Авто-выключение реле по таймерам
             check_auto_off()
